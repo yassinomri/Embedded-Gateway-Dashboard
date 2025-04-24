@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Trash2 } from 'lucide-react';
+import { Shield, Trash2, Plus } from 'lucide-react';
 import { getFirewall, updateFirewall, FirewallConfig, Rule } from '../lib/firewall-api';
 import { useToast } from '../hooks/use-toast';
 import '../styles/Firewall.css';
@@ -7,6 +7,15 @@ import '../styles/Firewall.css';
 const Firewall: React.FC = () => {
   const [config, setConfig] = useState<FirewallConfig>({ enabled: true, rules: [] });
   const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newRule, setNewRule] = useState<Partial<Rule>>({
+    name: '',
+    src: 'any',
+    dest: 'any',
+    proto: 'tcp',
+    target: 'ACCEPT',
+    enabled: true,
+  });
   const { toast } = useToast();
 
   // Fetch firewall config
@@ -33,24 +42,45 @@ const Firewall: React.FC = () => {
     fetchConfig();
   }, []);
 
+  // Handle input changes in the form
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    setNewRule((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }));
+  };
+
   // Handle adding a new rule
-  const handleAddRule = async () => {
-    const newRule: Rule = {
+  const handleAddRule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRule.name) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Rule name is required',
+      });
+      return;
+    }
+
+    const rule: Rule = {
       id: `temp-${Date.now()}`,
-      name: `NewRule-${config.rules.length + 1}`,
-      src: 'any',
-      dest: 'any',
-      proto: 'tcp',
-      target: 'ACCEPT',
-      enabled: true,
+      name: newRule.name,
+      src: newRule.src || 'any',
+      dest: newRule.dest || 'any',
+      proto: newRule.proto || 'tcp',
+      target: newRule.target || 'ACCEPT',
+      enabled: newRule.enabled ?? true,
     };
 
     try {
-      await updateFirewall({ action: 'add', enabled: config.enabled, rules: [newRule] });
+      await updateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
       toast({
         title: 'Success',
         description: 'Rule added successfully',
       });
+      setIsModalOpen(false);
+      setNewRule({ name: '', src: 'any', dest: 'any', proto: 'tcp', target: 'ACCEPT', enabled: true });
       await fetchConfig();
     } catch (error) {
       console.error('Error adding rule:', error);
@@ -82,17 +112,21 @@ const Firewall: React.FC = () => {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div className="firewall-loading">Loading...</div>;
   }
 
   return (
     <div className="firewall-container">
-      <h1>Firewall Rules</h1>
-      <button onClick={handleAddRule} className="add-rule-button">
-        Add Rule
+      <h1 className="firewall-title">Firewall Rules</h1>
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className="add-rule-button"
+      >
+        <Plus size={20} /> Add Rule
       </button>
+
       {config.rules.length === 0 ? (
-        <p>No rules available</p>
+        <p className="no-rules">No rules available</p>
       ) : (
         <table className="firewall-table">
           <thead>
@@ -131,6 +165,79 @@ const Firewall: React.FC = () => {
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* Add Rule Modal */}
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Add New Rule</h2>
+            <form onSubmit={handleAddRule}>
+              <div className="form-group">
+                <label htmlFor="name">Name</label>
+                <input
+                  type="text"
+                  id="name"
+                  name="name"
+                  value={newRule.name}
+                  onChange={handleInputChange}
+                  placeholder="Enter rule name"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="src">Source</label>
+                <select id="src" name="src" value={newRule.src} onChange={handleInputChange}>
+                  <option value="any">Any</option>
+                  <option value="lan">LAN</option>
+                  <option value="wan">WAN</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="dest">Destination</label>
+                <select id="dest" name="dest" value={newRule.dest} onChange={handleInputChange}>
+                  <option value="any">Any</option>
+                  <option value="lan">LAN</option>
+                  <option value="wan">WAN</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="proto">Protocol</label>
+                <select id="proto" name="proto" value={newRule.proto} onChange={handleInputChange}>
+                  <option value="tcp">TCP</option>
+                  <option value="udp">UDP</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="target">Action</label>
+                <select id="target" name="target" value={newRule.target} onChange={handleInputChange}>
+                  <option value="ACCEPT">Accept</option>
+                  <option value="DROP">Drop</option>
+                  <option value="REJECT">Reject</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="enabled">
+                  <input
+                    type="checkbox"
+                    id="enabled"
+                    name="enabled"
+                    checked={newRule.enabled}
+                    onChange={handleInputChange}
+                  />
+                  Enabled
+                </label>
+              </div>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setIsModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit">Add Rule</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
