@@ -15,6 +15,22 @@ export interface FirewallConfig {
   rules: Rule[];
 }
 
+// Interface for raw API response
+interface ApiRule {
+  id: string;
+  name: string;
+  src: string;
+  dest: string;
+  proto: string;
+  target: string;
+  enabled: number; // API returns 1 or 0
+}
+
+interface ApiFirewallConfig {
+  enabled: number; // API returns 1 or 0
+  rules: ApiRule[];
+}
+
 export interface UpdateFirewallPayload {
   action: 'add' | 'update' | 'delete';
   enabled?: boolean;
@@ -24,19 +40,19 @@ export interface UpdateFirewallPayload {
 
 export const getFirewall = async (): Promise<FirewallConfig> => {
   try {
-    const response = await axios.get('http://localhost:8080/cgi-bin/firewall.cgi?action=get');
+    const response = await axios.get<ApiFirewallConfig>('http://localhost:8080/cgi-bin/firewall.cgi?action=get');
     console.log('getFirewall Raw Response:', response.data);
     // Normalize response
     const normalized: FirewallConfig = {
-      enabled: response.data.enabled === 1 || response.data.enabled === true,
-      rules: response.data.rules.map((rule: unknown) => ({
+      enabled: response.data.enabled === 1,
+      rules: response.data.rules.map((rule: ApiRule) => ({
         id: rule.id,
         name: rule.name,
         src: rule.src,
         dest: rule.dest,
         proto: rule.proto,
         target: rule.target,
-        enabled: rule.enabled === 1 || rule.enabled === true,
+        enabled: rule.enabled === 1,
       })),
     };
     console.log('getFirewall Normalized:', normalized);

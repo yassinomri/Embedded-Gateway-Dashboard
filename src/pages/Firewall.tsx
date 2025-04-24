@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Shield, Trash2, Plus } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Shield, Trash2, Plus, Activity, Loader, AlertTriangle } from 'lucide-react';
 import { getFirewall, updateFirewall, FirewallConfig, Rule } from '../lib/firewall-api';
 import { useToast } from '../hooks/use-toast';
 import '../styles/Firewall.css';
@@ -19,7 +19,8 @@ const Firewall: React.FC = () => {
   const { toast } = useToast();
 
   // Fetch firewall config
-  const fetchConfig = async () => {
+   
+  const fetchConfig = useCallback(async () => {
     try {
       setLoading(true);
       const response = await getFirewall();
@@ -35,12 +36,12 @@ const Firewall: React.FC = () => {
       });
       setLoading(false);
     }
-  };
+  }, []);
 
   // Fetch on mount
   useEffect(() => {
     fetchConfig();
-  }, []);
+  }, [fetchConfig]);
 
   // Handle input changes in the form
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -111,70 +112,98 @@ const Firewall: React.FC = () => {
     }
   };
 
+  // Get target class based on rule action
+  const getTargetClass = (target: string) => {
+    return `target-${target}`;
+  };
+
   if (loading) {
-    return <div className="firewall-loading">Loading...</div>;
+    return (
+      <div className="firewall-loading">
+        <div className="loading-spinner"></div>
+        Loading Firewall Rules...
+      </div>
+    );
   }
 
   return (
     <div className="firewall-container">
-      <h1 className="firewall-title">Firewall Rules</h1>
-      <button
-        onClick={() => setIsModalOpen(true)}
-        className="add-rule-button"
-      >
-        <Plus size={20} /> Add Rule
-      </button>
+      <h1 className="firewall-title">
+        <Shield size={28} color="#00f6ff" />
+        Firewall Rules
+      </h1>
+      
+      <div className="firewall-header">
+        <div className="firewall-status">
+          <div className="status-indicator"></div>
+          <span>Firewall {config.enabled ? 'Active' : 'Inactive'}</span>
+        </div>
+        <button
+          onClick={() => setIsModalOpen(true)}
+          className="add-rule-button"
+        >
+          <Plus size={20} /> Add Rule
+        </button>
+      </div>
 
       {config.rules.length === 0 ? (
-        <p className="no-rules">No rules available</p>
+        <div className="no-rules">
+          <AlertTriangle size={32} color="#00f6ff" />
+          <p>No firewall rules have been defined yet. Click "Add Rule" to create your first rule.</p>
+        </div>
       ) : (
-        <table className="firewall-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Source</th>
-              <th>Destination</th>
-              <th>Protocol</th>
-              <th>Action</th>
-              <th>Enabled</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {config.rules.map((rule) => (
-              <tr key={rule.id}>
-                <td>{rule.name}</td>
-                <td>{rule.src}</td>
-                <td>{rule.dest}</td>
-                <td>{rule.proto}</td>
-                <td>{rule.target}</td>
-                <td>
-                  <Shield
-                    color={rule.enabled ? '#00f6ff' : '#ff0000'}
-                    size={20}
-                  />
-                </td>
-                <td>
-                  <Trash2
-                    className="delete-icon"
-                    size={20}
-                    onClick={() => handleDeleteRule(rule.id)}
-                  />
-                </td>
+        <div className="firewall-table-container">
+          <table className="firewall-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Protocol</th>
+                <th>Action</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {config.rules.map((rule) => (
+                <tr key={rule.id}>
+                  <td>{rule.name}</td>
+                  <td>{rule.src}</td>
+                  <td>{rule.dest}</td>
+                  <td>{rule.proto}</td>
+                  <td className={`target-column ${getTargetClass(rule.target)}`}>{rule.target}</td>
+                  <td>
+                    <Shield
+                      color={rule.enabled ? '#00f6ff' : '#ff0000'}
+                      size={20}
+                    />
+                  </td>
+                  <td>
+                    <div className="actions-column">
+                      <div className="action-icon delete-icon" onClick={() => handleDeleteRule(rule.id)}>
+                        <Trash2 size={18} />
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {/* Add Rule Modal */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2>Add New Rule</h2>
+            <h2>
+              <Plus size={24} color="#00f6ff" />
+              Add New Rule
+            </h2>
             <form onSubmit={handleAddRule}>
               <div className="form-group">
-                <label htmlFor="name">Name</label>
+                <label htmlFor="name">Rule Name</label>
                 <input
                   type="text"
                   id="name"
@@ -218,7 +247,7 @@ const Firewall: React.FC = () => {
                 </select>
               </div>
               <div className="form-group">
-                <label htmlFor="enabled">
+                <div className="checkbox-group">
                   <input
                     type="checkbox"
                     id="enabled"
@@ -226,8 +255,8 @@ const Firewall: React.FC = () => {
                     checked={newRule.enabled}
                     onChange={handleInputChange}
                   />
-                  Enabled
-                </label>
+                  <label htmlFor="enabled">Enabled</label>
+                </div>
               </div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setIsModalOpen(false)}>
