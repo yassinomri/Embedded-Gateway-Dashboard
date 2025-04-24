@@ -1,0 +1,21 @@
+.custom-button {
+  background-color: #1BA3DD !important;
+  color: white !important;
+}
+.custom-button:hover {
+  background-color: #147AA6 !important;
+}
+.custom-button:disabled {
+  background-color: #A0C4E4 !important;
+  opacity: 0.7;
+}
+.custom-switch[aria-checked="true"] {
+  background-color: #1BA3DD !important;
+}
+.custom-switch[aria-checked="true"]:hover {
+  background-color: #147AA6 !important;
+}
+.custom-tab[data-state="active"] {
+  background-color: #147AA6 !important;
+  color: white !important;
+}
