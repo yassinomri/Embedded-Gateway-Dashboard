@@ -1,186 +1,52 @@
-.firewall-container {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: #121212;
-  color: #e6e6e6;
-  font-family: 'Share Tech Mono', monospace;
-  border-radius: 6px;
+.firewall-select-wrapper {
+  margin-bottom: 1rem;
 }
 
-.firewall-container h1 {
-  font-family: 'Orbitron', sans-serif;
-  color: #00f6ff;
-  font-size: 24px;
-  text-transform: uppercase;
-  margin-bottom: 20px;
-}
-
-.firewall-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.firewall-controls label {
-  font-size: 14px;
-  color: #b0b0b0;
-}
-
-.firewall-controls input[type="checkbox"] {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background-color: #222;
-  border: 1px solid #00f6ff;
-  border-radius: 3px;
-  cursor: pointer;
-  margin-left: 8px;
-  vertical-align: middle;
-}
-
-.firewall-controls input[type="checkbox"]:checked {
-  background-color: #00f6ff;
-}
-
-.firewall-controls button {
-  background-color: #00f6ff;
-  color: #121212;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 14px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.firewall-controls button:hover {
-  background-color: #00d4e6;
-}
-
-.firewall-form {
-  background-color: #1c1c1c;
-  padding: 16px;
-  border-radius: 6px;
-  margin-bottom: 20px;
-}
-
-.firewall-form label {
+.firewall-select-wrapper label {
   display: block;
-  font-size: 14px;
-  color: #b0b0b0;
-  margin-bottom: 8px;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
 }
 
-.firewall-form input[type="text"],
-.firewall-form select {
+.firewall-select {
   width: 100%;
-  background-color: #222;
-  color: #e6e6e6;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 14px;
-  padding: 8px;
-  border: 1px solid #00f6ff;
-  border-radius: 4px;
-  margin-bottom: 12px;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
 }
 
-.firewall-form input[type="checkbox"] {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background-color: #222;
-  border: 1px solid #00f6ff;
-  border-radius: 3px;
-  cursor: pointer;
-  vertical-align: middle;
+.firewall-input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
 }
 
-.firewall-form input[type="checkbox"]:checked {
-  background-color: #00f6ff;
-}
-
-.firewall-form button {
-  background-color: #00f6ff;
-  color: #121212;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 14px;
-  padding: 8px 16px;
+.firewall-button {
+  padding: 0.5rem 1rem;
+  background-color: #1BA3DD;
+  color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 1rem;
 }
 
-.firewall-form button:hover {
-  background-color: #00d4e6;
+.firewall-button:hover {
+  background-color: #147AA6;
 }
 
-.firewall-table {
-  width: 100%;
-  border-collapse: collapse;
-  background-color: #1c1c1c;
-  border-radius: 6px;
+.firewall-rule {
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  margin-bottom: 1rem;
 }
 
-.firewall-table th,
-.firewall-table td {
-  padding: 12px;
-  text-align: left;
-  font-size: 14px;
-  border-bottom: 1px solid #2a2a2a;
-}
-
-.firewall-table th {
-  background-color: #222;
-  color: #00f6ff;
-}
-
-.firewall-table td {
-  color: #e6e6e6;
-}
-
-.firewall-table tr:hover {
-  background-color: #2a2a2a;
-  cursor: pointer;
-}
-
-.firewall-table input[type="text"],
-.firewall-table select {
-  width: 100%;
-  background-color: #222;
-  color: #e6e6e6;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 14px;
-  padding: 6px;
-  border: 1px solid #00f6ff;
-  border-radius: 4px;
-}
-
-.firewall-table input[type="text"]:disabled,
-.firewall-table select:disabled {
-  background-color: #333;
-  color: #888;
-  border-color: #444;
-  cursor: not-allowed;
-}
-
-.firewall-table input[type="checkbox"] {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background-color: #222;
-  border: 1px solid #00f6ff;
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.firewall-table input[type="checkbox"]:checked {
-  background-color: #00f6ff;
-}
-
-.firewall-table input[type="checkbox"]:disabled {
-  background-color: #333;
-  border-color: #444;
-  cursor: not-allowed;
+.firewall-title {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 1rem;
 }
