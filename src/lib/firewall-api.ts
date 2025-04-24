@@ -1,97 +1,58 @@
-import { FirewallConfig, NewFirewallRule, FirewallRule, RawFirewallRule, DeleteFirewallRule } from "@/types/firewall";
+import axios from 'axios';
 
-export const firewallApi = {
-  getFirewall: async (): Promise<FirewallConfig> => {
-    const url = "/cgi-bin/firewall.cgi?action=get";
-    console.log("getFirewall Request:", { url });
+export interface Rule {
+  id: string;
+  name: string;
+  src: string;
+  dest: string;
+  proto: string;
+  target: string;
+  enabled: boolean;
+}
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+export interface FirewallConfig {
+  enabled: boolean;
+  rules: Rule[];
+}
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
+export interface UpdateFirewallPayload {
+  action: 'add' | 'update' | 'delete';
+  enabled?: boolean;
+  rules?: Rule[];
+  id?: string;
+}
 
-    const data = await response.json();
-    console.log("getFirewall Response:", data);
-
-    if (!data.rules || !Array.isArray(data.rules)) {
-      throw new Error("Invalid firewall data: rules missing or not an array");
-    }
-
-    return {
-      enabled: data.enabled,
-      rules: data.rules.map((rule: RawFirewallRule) => ({
-        id: rule.id || `rule-${Math.random().toString(36).slice(2)}`,
+export const getFirewall = async (): Promise<FirewallConfig> => {
+  try {
+    const response = await axios.get('http://localhost:8080/cgi-bin/firewall.cgi?action=get');
+    console.log('getFirewall Raw Response:', response.data);
+    // Normalize response
+    const normalized: FirewallConfig = {
+      enabled: response.data.enabled === 1 || response.data.enabled === true,
+      rules: response.data.rules.map((rule: unknown) => ({
+        id: rule.id,
         name: rule.name,
-        source: rule.src_ip,
-        destination: rule.dest_ip,
-        protocol: (rule.proto || "").toUpperCase(),
-        action: (rule.target || "").toUpperCase(),
-        enabled: rule.enabled,
+        src: rule.src,
+        dest: rule.dest,
+        proto: rule.proto,
+        target: rule.target,
+        enabled: rule.enabled === 1 || rule.enabled === true,
       })),
-    } as FirewallConfig;
-  },
+    };
+    console.log('getFirewall Normalized:', normalized);
+    return normalized;
+  } catch (error) {
+    console.error('getFirewall Error:', error);
+    throw error;
+  }
+};
 
-  updateFirewall: async (payload: {
-    rules?: Array<RawFirewallRule | DeleteFirewallRule>;
-    enabled?: boolean;
-    action?: "add" | "update" | "delete";
-  }): Promise<{ status: string; message: string }> => {
-    const url = "/cgi-bin/firewall.cgi";
-    console.log("updateFirewall Request:", payload);
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log("updateFirewall Response:", data);
-
-    return data as { status: string; message: string };
-  },
-
-  addRule: async (newRule: NewFirewallRule): Promise<{ status: string; message: string }> => {
-    console.log("addRule Request:", newRule);
-    return firewallApi.updateFirewall({
-      action: "add",
-      rules: [{
-        name: newRule.name,
-        src_ip: newRule.source,
-        dest_ip: newRule.destination,
-        proto: newRule.protocol.toLowerCase(),
-        target: newRule.action.toLowerCase(),
-        enabled: newRule.enabled ?? true,
-        src: "lan",
-        dest: "wan",
-      }],
-    });
-  },
-
-  enableFirewall: async (enabled: boolean): Promise<{ status: string; message: string }> => {
-    console.log("enableFirewall Request:", enabled);
-    return firewallApi.updateFirewall({
-      enabled,
-    });
-  },
-
-  deleteRule: async (id: string): Promise<{ status: string; message: string }> => {
-    console.log("deleteRule Request:", { id });
-    return firewallApi.updateFirewall({
-      action: "delete",
-      rules: [{ id }],
-    });
-  },
+export const updateFirewall = async (payload: UpdateFirewallPayload): Promise<void> => {
+  try {
+    const response = await axios.post('http://localhost:8080/cgi-bin/firewall.cgi', payload);
+    console.log('updateFirewall Response:', response.data);
+  } catch (error) {
+    console.error('updateFirewall Error:', error);
+    throw error;
+  }
 };
