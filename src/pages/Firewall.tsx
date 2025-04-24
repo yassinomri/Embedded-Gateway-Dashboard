@@ -19,7 +19,6 @@ const Firewall: React.FC = () => {
   const { toast } = useToast();
 
   // Fetch firewall config
-   
   const fetchConfig = useCallback(async () => {
     try {
       setLoading(true);
@@ -112,6 +111,26 @@ const Firewall: React.FC = () => {
     }
   };
 
+  // Handle toggling firewall enabled state
+  const handleToggleFirewall = async () => {
+    const newEnabled = !config.enabled;
+    try {
+      await updateFirewall({ action: 'update', enabled: newEnabled });
+      toast({
+        title: 'Success',
+        description: `Firewall ${newEnabled ? 'enabled' : 'disabled'} successfully`,
+      });
+      await fetchConfig();
+    } catch (error) {
+      console.error('Error toggling firewall:', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to toggle firewall state',
+      });
+    }
+  };
+
   // Get target class based on rule action
   const getTargetClass = (target: string) => {
     return `target-${target}`;
@@ -134,10 +153,18 @@ const Firewall: React.FC = () => {
       </h1>
       
       <div className="firewall-header">
-        <div className="firewall-status">
-          <div className="status-indicator"></div>
-          <span>Firewall {config.enabled ? 'Active' : 'Inactive'}</span>
-        </div>
+      <div className="firewall-status">
+        <div className={`status-indicator ${config.enabled ? 'active' : 'inactive'}`}></div>
+        <span>Firewall {config.enabled ? 'Active' : 'Inactive'}</span>
+        <label className="firewall-toggle">
+          <input
+            type="checkbox"
+            checked={config.enabled}
+            onChange={handleToggleFirewall}
+          />
+          <span className="toggle-slider"></span>
+        </label>
+      </div>
         <button
           onClick={() => setIsModalOpen(true)}
           className="add-rule-button"
