@@ -70,7 +70,7 @@ get_throughput() {
   local rx_bytes_before=$(echo $stats_before | awk '{print $1}')
   local tx_bytes_before=$(echo $stats_before | awk '{print $2}')
   log "Before: rx_bytes=$rx_bytes_before, tx_bytes=$tx_bytes_before"
-  sleep 3 # Increased to 3 seconds
+  sleep 3 # 3 seconds to capture traffic
   local stats_after=$(cat /proc/net/dev | grep "$interface" | awk '{print $2, $10}')
   local rx_bytes_after=$(echo $stats_after | awk '{print $1}')
   local tx_bytes_after=$(echo $stats_after | awk '{print $2}')
@@ -79,8 +79,12 @@ get_throughput() {
   local tx_mbps=$(( (tx_bytes_after - tx_bytes_before) * 8 / 3000000 ))
   local throughput=$(( (rx_mbps + tx_mbps) / 2 ))
   [ $throughput -lt 0 ] && throughput=0
-  log "Throughput: rx_mbps=$rx_mbps, tx_mbps=$tx_mbps, avg=$throughput"
-  echo $throughput
+  # Simple moving average (store last throughput in /tmp)
+  local last_throughput=$(cat /tmp/last_throughput 2>/dev/null || echo 0)
+  local avg_throughput=$(( (throughput + last_throughput) / 2 ))
+  echo $avg_throughput > /tmp/last_throughput
+  log "Throughput: rx_mbps=$rx_mbps, tx_mbps=$tx_mbps, avg=$avg_throughput"
+  echo $avg_throughput
 }
 
 # Function to manage history
