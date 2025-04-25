@@ -12,7 +12,7 @@ echo
 
 # Handle preflight OPTIONS request
 if [ "$REQUEST_METHOD" = "OPTIONS" ]; then
-    echo "{\"status\": \"success\", \"message\": \"CORS preflight\"}" >> /tmp/network_cgi.log
+    echo "$(date): CORS preflight" >> /tmp/network_cgi.log
     echo "{\"status\": \"success\", \"message\": \"CORS preflight\"}"
     exit 0
 fi
@@ -29,22 +29,24 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
         exit 0
     fi
 
+    echo "$(date): ifconfig output: $IFCONFIG" >> /tmp/network_cgi.log
     STATUS=$(echo "$IFCONFIG" | grep -q "UP" && echo "up" || echo "down")
-    MAC=$(echo "$IFCONFIG" | grep -o "HWaddr [0-9A-F:]\+" | cut -d' ' -f2)
-    IP=$(echo "$IFCONFIG" | grep -o "inet addr:[0-9.]\+" | cut -d':' -f2)
-    NETMASK=$(echo "$IFCONFIG" | grep -o "Mask:[0-9.]\+" | cut -d':' -f2)
+    MAC=$(echo "$IFCONFIG" | grep -oE "HWaddr [0-9A-F:]{17}" | cut -d' ' -f2)
+    IP=$(echo "$IFCONFIG" | grep -oE "inet addr:[0-9.]{7,15}" | cut -d':' -f2)
+    NETMASK=$(echo "$IFCONFIG" | grep -oE "Mask:[0-9.]{7,15}" | cut -d':' -f2)
     GATEWAY=$(uci get network.lan.gateway 2>/dev/null || echo "")
 
     # Log parsed data
-    echo "$(date): Parsed - STATUS=$STATUS, MAC=$MAC, IP=$IP, NETMASK=$NETMASK, GATEWAY=$GATEWAY" >> /tmp/network_cgi.lg
+    echo "$(date): Parsed - STATUS=$STATUS, MAC=$MAC, IP=$IP, NETMASK=$NETMASK, GATEWAY=$GATEWAY" >> /tmp/network_cgi.log
 
     # Validate data
     [ -z "$MAC" ] && MAC="00:00:00:00:00:00"
     [ -z "$IP" ] && IP="0.0.0.0"
     [ -z "$NETMASK" ] && NETMASK="255.255.255.0"
+    [ -z "$GATEWAY" ] && GATEWAY="0.0.0.0"
 
     # Output JSON
-    JSON="{\"interfaces\": [{\"id\": \"eth0\", \"name\": \"eth0\", \"status\": \"$STATUS\", \"macAddress\": \"$MAC\", \"
+    JSON="{\"interfaces\": [{\"id\": \"eth0\", \"name\": \"eth0\", \"status\": \"$STATUS\", \"macAddress\": \"$MAC\", \"ipAddress\": \"$IP\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}]}"
     echo "$JSON"
     echo "$(date): GET response sent: $JSON" >> /tmp/network_cgi.log
     exit 0
@@ -68,7 +70,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
             fi
             uci commit network 2>/dev/null
             /etc/init.d/network reload 2>/dev/null
-            RESPONSE="{\"status\": \"success\", \"message\": \"Updated $INTERFACE to IP: $IP, Gateway: ${GATEWAY:-none}"
+            RESPONSE="{\"status\": \"success\", \"message\": \"Updated $INTERFACE to IP: $IP, Gateway: ${GATEWAY:-none}\"}"
             echo "$RESPONSE"
             echo "$(date): POST response sent: $RESPONSE" >> /tmp/network_cgi.log
         else

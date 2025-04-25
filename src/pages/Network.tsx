@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/network-api";
 import { Network as NetworkIcon, Wifi, Database } from "lucide-react";
@@ -185,12 +185,12 @@ export default function Network() {
   }, [dhcpDnsData]);
 
   useEffect(() => {
-    if (networkData) {
+    if (networkData && networkData.interfaces) {
       const eth0 = networkData.interfaces.find((iface) => iface.id === "eth0");
       if (eth0) {
         setEth0Config({
-          address: eth0.ipv4.address,
-          gateway: eth0.ipv4.gateway || "",
+          address: eth0.ipAddress,
+          gateway: eth0.gateway || "",
         });
       }
     }
@@ -233,7 +233,7 @@ export default function Network() {
   }
 
   // Handle missing data
-  if (!networkData || !wirelessData || !dhcpDnsData) {
+  if (!networkData || !networkData.interfaces || !wirelessData || !dhcpDnsData) {
     return (
       <div className="container mx-auto p-6">
         <h1 className="text-3xl font-bold mb-6">Network Configuration</h1>
@@ -293,7 +293,7 @@ export default function Network() {
                       <Label htmlFor={`address-${iface.id}`}>IPv4 Address</Label>
                       <Input
                         id={`address-${iface.id}`}
-                        value={iface.id === "eth0" ? eth0Config.address : iface.ipv4.address}
+                        value={iface.id === "eth0" ? eth0Config.address : iface.ipAddress}
                         onChange={(e) => {
                           if (iface.id === "eth0") {
                             setEth0Config({ ...eth0Config, address: e.target.value });
@@ -307,13 +307,13 @@ export default function Network() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor={`netmask-${iface.id}`}>Netmask</Label>
-                      <Input id={`netmask-${iface.id}`} value={iface.ipv4.netmask} disabled />
+                      <Input id={`netmask-${iface.id}`} value={iface.netmask} disabled />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor={`gateway-${iface.id}`}>Gateway</Label>
                       <Input
                         id={`gateway-${iface.id}`}
-                        value={iface.id === "eth0" ? eth0Config.gateway : iface.ipv4.gateway || ""}
+                        value={iface.id === "eth0" ? eth0Config.gateway : iface.gateway || ""}
                         onChange={(e) => {
                           if (iface.id === "eth0") {
                             setEth0Config({ ...eth0Config, gateway: e.target.value });

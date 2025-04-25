@@ -2,9 +2,7 @@ import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
 
 export const apiClient = {
   getInterfaces: async (): Promise<NetworkData> => {
-    const url = "/cgi-bin/network.cgi";
-    // For testing, uncomment to bypass proxy:
-    // const url = "http://localhost:8080/cgi-bin/network.cgi";
+    const url = "http://localhost:8080/cgi-bin/network.cgi?option=get";
 
     console.log("getInterfaces Request:", { url, headers: { "Content-Type": "application/json" } });
 
@@ -27,9 +25,8 @@ export const apiClient = {
       throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
     }
 
-    let data;
+    let data: NetworkData;
     try {
-      // Try parsing full response
       data = JSON.parse(responseText);
     } catch (e) {
       // Fallback: Extract first valid JSON object
@@ -50,28 +47,14 @@ export const apiClient = {
       throw new Error(`Invalid response format: ${responseText}`);
     }
 
-    return {
-      interfaces: [
-        ...data.interfaces,
-        {
-          id: "eth1",
-          name: "eth1",
-          status: "down",
-          macAddress: "00:1A:2B:3C:4D:5F",
-          ipv4: {
-            address: "192.168.2.1",
-            netmask: "255.255.255.0",
-          },
-        },
-      ],
-    };
+    return data;
   },
 
   updateInterface: async (
     id: string,
-    data: Partial<NetworkData["interfaces"][0]["ipv4"]> & { status: string }
+    data: { address: string; gateway?: string; status: string }
   ): Promise<{ status: string; message: string }> => {
-    const url = "/cgi-bin/network.cgi";
+    const url = "http://localhost:8080/cgi-bin/network.cgi";
     console.log("updateInterface Request:", { url, id, data });
 
     const response = await fetch(url, {
