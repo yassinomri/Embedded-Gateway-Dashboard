@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import Configuration from "@/pages/Configuration";
 import Network from "@/pages/Network"; 
 import Firewall from "@/pages/Firewall";
+import Performance from "@/pages/Performance";
 
 
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -39,19 +40,12 @@ const App = () => (
               
               {/* Network Route */}
               <Route path="/network" element={<Network />} />
-              <Route path="/network/interfaces" element={<Network />} />
-              <Route path="/network/wireless" element={<Network />} />
-              <Route path="/network/dhcp-dns" element={<Network />} />
               
               {/* Firewall Routes */}
               <Route path="/firewall" element={<Firewall />} />
-              <Route path="/firewall/rules" element={<PlaceholderPage title="Firewall Rules" />} />
-              <Route path="/firewall/port-forwarding" element={<PlaceholderPage title="Port Forwarding" />} />
-              <Route path="/firewall/zones" element={<PlaceholderPage title="Firewall Zones" />} />
               
               {/* Performance Routes */}
-              <Route path="/performance/bandwidth" element={<PlaceholderPage title="Bandwidth Monitoring" />} />
-              <Route path="/performance/latency" element={<PlaceholderPage title="Latency Monitoring" />} />
+              <Route path="/performance" element={<Performance />} />
               
               {/* Packet Analysis Routes */}
               <Route path="/packet/traffic" element={<PlaceholderPage title="Traffic Breakdown" />} />

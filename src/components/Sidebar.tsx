@@ -32,8 +32,8 @@ const navItems: NavItemProps[] = [
   { title: "Dashboard", icon: Home, path: "/" },
   { title: "Network", icon: Network, path: "/network" },
   { title: "Firewall", icon: Shield, path: "/firewall" },
-  { title: "Performance", icon: BarChart, path: "/performance/bandwidth" },
-  { title: "Packet Analysis", icon: Package, path: "/packet/traffic" },
+  { title: "Performance", icon: BarChart, path: "/performance" },
+  { title: "Packet Analysis", icon: Package, path: "/packet" },
   { title: "System", icon: Server, path: "/system/information" },
   { title: "Configuration", icon: Settings, path: "/configuration" },
 ];
