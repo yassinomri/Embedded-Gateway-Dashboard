@@ -35,7 +35,7 @@ const Firewall: React.FC = () => {
       });
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
   // Fetch on mount
   useEffect(() => {
