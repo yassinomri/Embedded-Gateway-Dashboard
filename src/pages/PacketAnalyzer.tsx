@@ -145,16 +145,40 @@ const PacketAnalyzer = () => {
                 <span className="detail-label">Source:</span>
                 <span className="detail-value">{selectedPacket.src}</span>
               </div>
-            </div>
-            <div className="detail-card">
               <div className="detail-item">
                 <span className="detail-label">Destination:</span>
                 <span className="detail-value">{selectedPacket.dst}</span>
               </div>
+            </div>
+            <div className="detail-card">
               <div className="detail-item">
                 <span className="detail-label">Info:</span>
                 <span className="detail-value">{selectedPacket.info}</span>
               </div>
+              {selectedPacket.protocol && (
+                <div className="detail-item">
+                  <span className="detail-label">Protocol:</span>
+                  <span className="detail-value">{selectedPacket.protocol}</span>
+                </div>
+              )}
+              {selectedPacket.length && (
+                <div className="detail-item">
+                  <span className="detail-label">Length:</span>
+                  <span className="detail-value">{selectedPacket.length} bytes</span>
+                </div>
+              )}
+              {selectedPacket.type && (
+                <div className="detail-item">
+                  <span className="detail-label">Type:</span>
+                  <span className="detail-value">{selectedPacket.type}</span>
+                </div>
+              )}
+              {selectedPacket.flags && (
+                <div className="detail-item">
+                  <span className="detail-label">Flags:</span>
+                  <span className="detail-value">{selectedPacket.flags}</span>
+                </div>
+              )}
             </div>
           </div>
         </section>
