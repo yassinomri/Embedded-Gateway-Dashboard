@@ -1,80 +1,86 @@
-"use client";
+import React, { useState, useEffect } from 'react';
+import { fetchCapturedPackets } from '@/lib/packet-analyzer-api';
+import { PacketData } from '@/types/packet-analyzer';
 
-import { useEffect, useState } from "react";
-import { fetchCapturedPackets } from "@/lib/packet-analyzer-api";
-import { PacketData } from "@/types/packet-analyzer";
+// Helper function to format the timestamp
+const formatTimestamp = (timestamp: string) => {
+  const date = new Date(parseFloat(timestamp) * 1000); // Convert to milliseconds
+  return date.toISOString().replace('T', ' ').substring(0, 19); // Format as 'YYYY-MM-DD HH:mm:ss'
+};
 
-export default function PacketAnalyzer() {
+const PacketAnalyzer = () => {
   const [packets, setPackets] = useState<PacketData[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isCapturing, setIsCapturing] = useState(false);
+  const [isCapturing, setIsCapturing] = useState<boolean>(false);
 
-  async function loadPackets() {
-    setLoading(true);
-    setError(null);
+  // Start capturing when the page loads
+  useEffect(() => {
+    const capturePackets = async () => {
+      try {
+        const data = await fetchCapturedPackets();
+        setPackets(data);
+      } catch (error) {
+        console.error("Error capturing packets", error);
+      }
+    };
 
-    try {
-      const data = await fetchCapturedPackets();
-      setPackets(data);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
+    // Start the capture immediately when the component loads
+    capturePackets();
 
-  function handleCaptureToggle() {
-    if (!isCapturing) {
-      // Start capturing
-      setIsCapturing(true);
-      loadPackets();  // Fetch once
-    } else {
-      // Stop capturing
-      setIsCapturing(false);
-    }
-  }
+    // Optionally, you can set an interval to refresh packets every 5 seconds:
+    const intervalId = setInterval(capturePackets, 5000);
+
+    // Cleanup the interval when the component unmounts
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, []);  // Empty dependency array means it runs once when the component mounts
+
+  const handleStartCapture = async () => {
+    setIsCapturing(true);
+    await fetchCapturedPackets(); // Start capturing packets immediately
+  };
+
+  const handleStopCapture = () => {
+    setIsCapturing(false);
+  };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Packet Analyzer</h1>
+    <div>
+      <h1>Packet Analyzer</h1>
+      {isCapturing ? (
+        <button onClick={handleStopCapture}>Stop Capturing</button>
+      ) : (
+        <button onClick={handleStartCapture}>Start Capturing</button>
+      )}
 
-      <button
-        onClick={handleCaptureToggle}
-        className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded mb-4"
-      >
-        {isCapturing ? "Stop Capturing" : "Start Capturing"}
-      </button>
-
-      {loading && <div>Loading packets...</div>}
-      {error && <div className="text-red-500">Error: {error}</div>}
-
-      {!loading && packets.length > 0 && (
-        <table className="table-auto w-full mt-4">
-          <thead>
-            <tr>
-              <th className="px-4 py-2">Time</th>
-              <th className="px-4 py-2">Source</th>
-              <th className="px-4 py-2">Destination</th>
-              <th className="px-4 py-2">Info</th>
-            </tr>
-          </thead>
-          <tbody>
-            {packets.map((pkt, index) => (
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Source</th>
+            <th>Destination</th>
+            <th>Info</th>
+          </tr>
+        </thead>
+        <tbody>
+          {packets.length > 0 ? (
+            packets.map((packet, index) => (
               <tr key={index}>
-                <td className="border px-4 py-2">{pkt.time}</td>
-                <td className="border px-4 py-2">{pkt.src}</td>
-                <td className="border px-4 py-2">{pkt.dst}</td>
-                <td className="border px-4 py-2">{pkt.info}</td>
+                <td>{formatTimestamp(packet.time)}</td> {/* Format the time */}
+                <td>{packet.src}</td>
+                <td>{packet.dst}</td>
+                <td>{packet.info}</td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-
-      {!loading && packets.length === 0 && (
-        <div className="text-gray-500 mt-4">No packets captured yet.</div>
-      )}
+            ))
+          ) : (
+            <tr>
+              <td colSpan={4}>No packets captured yet.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
-}
+};
+
+export default PacketAnalyzer;
