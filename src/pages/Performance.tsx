@@ -1,10 +1,10 @@
-import React, { useState, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import useSWR from 'swr';
 import {
   Card,
   CardHeader,
   CardTitle,
-  CardContent
+  CardContent,
 } from '@/components/ui/card';
 import {
   Activity,
@@ -13,14 +13,17 @@ import {
   Network,
   Play,
   RefreshCw,
-  Settings
+  Settings,
 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import {
   getPerformance,
   updatePerformance,
-  PerformanceData
+  PerformanceData,
+  HistoryEntry,
 } from '../lib/performance-api';
+import { savePerformanceData, getHistoricalData, clearOldData } from '../lib/db'; // Import DB functions
+import { lazy, Suspense } from 'react';
 
 const PerformanceChart = lazy(() =>
   import('@/styles/PerformanceChart').then((mod) => {
@@ -32,7 +35,7 @@ const PerformanceChart = lazy(() =>
 const EMPTY_DATA: PerformanceData = {
   metrics: { latency: 0, packetLoss: 0, throughput: 0 },
   history: [],
-  qos: { enabled: false }
+  qos: { enabled: false },
 };
 
 const MetricCardSkeleton = () => (
@@ -50,26 +53,30 @@ const MetricCardSkeleton = () => (
 const Performance = () => {
   const [testForm, setTestForm] = useState({ targetIp: '8.8.8.8', duration: 30 });
   const [testing, setTesting] = useState(false);
+  const [history, setHistory] = useState<HistoryEntry[]>([]); // State for historical data
   const { toast } = useToast();
 
+  // Fetch live data with SWR
   const {
     data = EMPTY_DATA,
     error,
     isValidating,
-    mutate
+    mutate,
   } = useSWR<PerformanceData>(
     'performance-data',
     async () => {
       try {
         const res = await getPerformance();
+        // Save metrics to IndexedDB
+        await savePerformanceData(res.metrics);
         return {
           metrics: {
             latency: res.metrics.latency || 0,
             packetLoss: res.metrics.packetLoss || 0,
-            throughput: res.metrics.throughput || 0
+            throughput: res.metrics.throughput || 0,
           },
-          history: Array.isArray(res.history) ? res.history.slice(-50) : [],
-          qos: { enabled: res.qos?.enabled ?? false }
+          history: [], // Ignore server history; we'll use IndexedDB
+          qos: { enabled: res.qos?.enabled ?? false },
         };
       } catch (err) {
         console.error('Fetch error:', err);
@@ -89,16 +96,33 @@ const Performance = () => {
         toast({
           variant: 'destructive',
           title: 'Error',
-          description: 'Failed to load performance data'
-        })
+          description: 'Failed to load performance data',
+        }),
     }
   );
+
+  // Fetch historical data from IndexedDB on mount and when new data is saved
+  useEffect(() => {
+    const fetchHistory = async () => {
+      const historicalData = await getHistoricalData(50);
+      setHistory(historicalData);
+    };
+    fetchHistory();
+  }, [data.metrics]); // Update history when new metrics are fetched
+
+  // Optional: Periodically clear old data (e.g., every 24 hours)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      clearOldData(7); // Clear data older than 7 days
+    }, 24 * 60 * 60 * 1000); // Run daily
+    return () => clearInterval(interval);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setTestForm((prev) => ({
       ...prev,
-      [name]: name === 'duration' ? Math.max(1, parseInt(value, 10) || 1) : value
+      [name]: name === 'duration' ? Math.max(1, parseInt(value, 10) || 1) : value,
     }));
   };
 
@@ -109,7 +133,7 @@ const Performance = () => {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Valid target IP and duration are required'
+        description: 'Valid target IP and duration are required',
       });
       return;
     }
@@ -122,7 +146,7 @@ const Performance = () => {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to run network test'
+        description: 'Failed to run network test',
       });
     } finally {
       setTesting(false);
@@ -135,14 +159,14 @@ const Performance = () => {
       await updatePerformance({ action: 'update', qosEnabled: newEnabled });
       toast({
         title: 'Success',
-        description: `QoS ${newEnabled ? 'enabled' : 'disabled'} successfully`
+        description: `QoS ${newEnabled ? 'enabled' : 'disabled'} successfully`,
       });
       mutate();
     } catch {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to toggle QoS'
+        description: 'Failed to toggle QoS',
       });
     }
   };
@@ -184,29 +208,27 @@ const Performance = () => {
           const colors = {
             latency: ['bg-blue-100', 'text-blue-600'],
             packetLoss: ['bg-amber-100', 'text-amber-600'],
-            throughput: ['bg-green-100', 'text-green-600']
+            throughput: ['bg-green-100', 'text-green-600'],
           };
           const units = {
             latency: 'ms',
             packetLoss: '%',
-            throughput: 'Mbps'
+            throughput: 'Mbps',
           };
           const icons = {
             latency: <Clock className={colors[metric][1]} size={24} />,
             packetLoss: <Activity className={colors[metric][1]} size={24} />,
-            throughput: <Wifi className={colors[metric][1]} size={24} />
+            throughput: <Wifi className={colors[metric][1]} size={24} />,
           };
           return (
             <Card key={metric} className="shadow-sm hover:shadow transition-shadow">
               <CardContent className="p-6 flex items-center space-x-4">
-                <div className={`p-3 ${colors[metric][0]} rounded-full`}>
-                  {icons[metric]}
-                </div>
+                <div className={`p-3 ${colors[metric][0]} rounded-full`}>{icons[metric]}</div>
                 <div>
                   <p className="text-sm font-medium text-gray-500 capitalize">{metric}</p>
                   <div className="flex items-baseline gap-1">
                     <h3 className="text-2xl font-bold text-gray-900">
-                      {isLoading ? '--' : data.metrics[metric]}
+                      {isLoading ? '--' : data.metrics[metric as keyof typeof data.metrics]}
                     </h3>
                     <span className="text-sm text-gray-500">{units[metric]}</span>
                   </div>
@@ -225,7 +247,7 @@ const Performance = () => {
           <CardContent>
             <div className="h-80">
               <Suspense fallback={<div className="h-full bg-gray-100 animate-pulse rounded-md" />}>
-                <PerformanceChart history={data.history} />
+                <PerformanceChart history={history} /> {/* Use local history state */}
               </Suspense>
             </div>
           </CardContent>
