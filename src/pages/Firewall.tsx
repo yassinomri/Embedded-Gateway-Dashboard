@@ -1,13 +1,45 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Shield, Trash2, Plus, Activity, Loader, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Shield, Trash2, Plus, AlertTriangle } from 'lucide-react';
 import { getFirewall, updateFirewall, FirewallConfig, Rule } from '../lib/firewall-api';
 import { useToast } from '../hooks/use-toast';
+import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/Firewall.css';
+import { usePersistedState } from '../hooks/usePersistedState';
+
+// Debounce utility function
+const debounce = <F extends (...args: unknown[]) => Promise<unknown>>(
+  func: F,
+  waitFor: number
+) => {
+  let timeout: NodeJS.Timeout;
+  let pendingPromise: Promise<unknown> | null = null;
+
+  return (...args: Parameters<F>): ReturnType<F> => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    if (pendingPromise) {
+      pendingPromise.catch(() => {}); // Clean up previous promise
+    }
+
+    return new Promise((resolve, reject) => {
+      timeout = setTimeout(() => {
+        pendingPromise = func(...args)
+          .then(resolve)
+          .catch(reject)
+          .finally(() => {
+            pendingPromise = null;
+          });
+      }, waitFor);
+    }) as ReturnType<F>;
+  };
+};
 
 const Firewall: React.FC = () => {
-  const [config, setConfig] = useState<FirewallConfig>({ enabled: true, rules: [] });
-  const [loading, setLoading] = useState(true);
+  const [config, setConfig] = usePersistedState<FirewallConfig>('firewallConfig', { enabled: true, rules: [] });
+  const [loading, setLoading] = usePersistedState<boolean>('firewallLoading', true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [updatePending, setUpdatePending] = useState(false);
   const [newRule, setNewRule] = useState<Partial<Rule>>({
     name: '',
     src: 'any',
@@ -17,41 +49,90 @@ const Firewall: React.FC = () => {
     enabled: true,
   });
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  // Fetch firewall config
-  const fetchConfig = useCallback(async () => {
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Clean up session storage if needed
+      sessionStorage.removeItem('firewallConfig');
+      sessionStorage.removeItem('firewallLoading');
+    };
+  
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
+  const initialRuleState = useMemo(() => ({
+    name: '',
+    src: 'any',
+    dest: 'any',
+    proto: 'tcp',
+    target: 'ACCEPT',
+    enabled: true,
+  }), []);
+
+  // Memoized config rules for performance
+  const rules = useMemo(() => config.rules, [config.rules]);
+
+  // Debounced API calls
+  const debouncedUpdateFirewall = useMemo(
+    () => debounce(updateFirewall, 300),
+    []
+  );
+
+  // Fetch firewall config with error handling
+  const fetchConfig = useCallback(async (showToast = true) => {
     try {
-      setLoading(true);
       const response = await getFirewall();
-      console.log('getFirewall Response:', response);
       setConfig(response);
-      setLoading(false);
+      sessionStorage.setItem('firewallConfig', JSON.stringify(response));
     } catch (error) {
-      console.error('Error fetching firewall config:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to fetch firewall rules',
-      });
+      if (showToast) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to fetch firewall rules',
+        });
+      }
+    } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, setConfig, setLoading]); 
+
+  useEffect(() => {
+    // Check if we have cached data
+    const cachedConfig = sessionStorage.getItem('firewallConfig');
+    if (cachedConfig) {
+      setConfig(JSON.parse(cachedConfig));
+      setLoading(false);
+    }
+    fetchConfig(false);
+  }, [fetchConfig, setConfig, location.key, setLoading]);
 
   // Fetch on mount
   useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+    fetchConfig(false);
+    
+    const intervalId = setInterval(() => {
+      getFirewall(true).then(setConfig).catch(() => {});
+    }, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, [fetchConfig, setConfig]);
 
-  // Handle input changes in the form
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  // Handle input changes
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    setNewRule((prev) => ({
+    setNewRule(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
-  };
+  }, []);
 
-  // Handle adding a new rule
+  // Handle adding a new rule with optimistic updates
   const handleAddRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRule.name) {
@@ -63,6 +144,7 @@ const Firewall: React.FC = () => {
       return;
     }
 
+    setUpdatePending(true);
     const rule: Rule = {
       id: `temp-${Date.now()}`,
       name: newRule.name,
@@ -73,68 +155,113 @@ const Firewall: React.FC = () => {
       enabled: newRule.enabled ?? true,
     };
 
+    // Optimistic update
+    const previousConfig = config;
+    setConfig(current => ({
+      ...current,
+      rules: [...current.rules, rule]
+    }));
+
     try {
-      await updateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
+      await debouncedUpdateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
       toast({
         title: 'Success',
         description: 'Rule added successfully',
       });
       setIsModalOpen(false);
-      setNewRule({ name: '', src: 'any', dest: 'any', proto: 'tcp', target: 'ACCEPT', enabled: true });
-      await fetchConfig();
+      setNewRule(initialRuleState);
     } catch (error) {
-      console.error('Error adding rule:', error);
+      // Revert on error
+      setConfig(previousConfig);
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to add rule',
       });
+    } finally {
+      setUpdatePending(false);
     }
   };
 
-  // Handle deleting a rule
+  // Handle deleting a rule with optimistic updates
   const handleDeleteRule = async (id: string) => {
+    setUpdatePending(true);
+    // Optimistic update
+    const previousConfig = config;
+    setConfig(current => ({
+      ...current,
+      rules: current.rules.filter(rule => rule.id !== id)
+    }));
+
     try {
-      await updateFirewall({ action: 'delete', id });
+      await debouncedUpdateFirewall({ action: 'delete', id });
       toast({
         title: 'Success',
         description: 'Rule deleted successfully',
       });
-      await fetchConfig();
     } catch (error) {
-      console.error('Error deleting rule:', error);
+      // Revert on error
+      setConfig(previousConfig);
       toast({
         variant: 'destructive',
         title: 'Error',
         description: 'Failed to delete rule',
       });
+    } finally {
+      setUpdatePending(false);
     }
   };
 
-  // Handle toggling firewall enabled state
-  const handleToggleFirewall = async () => {
-    const newEnabled = !config.enabled;
-    try {
+  // Debounced toggle handler
+  const debouncedToggleHandler = useMemo(() => 
+    debounce(async (newEnabled: boolean) => {
       await updateFirewall({ action: 'update', enabled: newEnabled });
       toast({
         title: 'Success',
         description: `Firewall ${newEnabled ? 'enabled' : 'disabled'} successfully`,
       });
-      await fetchConfig();
-    } catch (error) {
-      console.error('Error toggling firewall:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to toggle firewall state',
-      });
-    }
-  };
+    }, 300),
+  [toast]);
 
-  // Get target class based on rule action
-  const getTargetClass = (target: string) => {
+ // Handle toggling firewall with debouncing
+const handleToggleFirewall = async () => {
+  const newEnabled = !config.enabled;
+  setUpdatePending(true);
+  
+  // Capture current config for potential rollback
+  const previousConfig = config;
+  
+  // Optimistic update to both state and cache
+  const newConfig = { ...config, enabled: newEnabled };
+  setConfig(newConfig);
+  sessionStorage.setItem('firewallConfig', JSON.stringify(newConfig));
+  
+  try {
+    await debouncedToggleHandler(newEnabled);
+    toast({
+      title: 'Success',
+      description: `Firewall ${newEnabled ? 'enabled' : 'disabled'} successfully`,
+    });
+  } catch (error) {
+    // Revert on error
+    setConfig(previousConfig);
+    sessionStorage.setItem('firewallConfig', JSON.stringify(previousConfig));
+    toast({
+      variant: 'destructive',
+      title: 'Error',
+      description: 'Failed to toggle firewall state',
+    });
+  } finally {
+    setUpdatePending(false);
+  }
+};
+
+// (Duplicate declaration removed)
+
+  // Memoized target class getter
+  const getTargetClass = useCallback((target: string) => {
     return `target-${target}`;
-  };
+  }, []);
 
   if (loading) {
     return (
@@ -153,27 +280,29 @@ const Firewall: React.FC = () => {
       </h1>
       
       <div className="firewall-header">
-      <div className="firewall-status">
-        <div className={`status-indicator ${config.enabled ? 'active' : 'inactive'}`}></div>
-        <span>Firewall {config.enabled ? 'Active' : 'Inactive'}</span>
-        <label className="firewall-toggle">
-          <input
-            type="checkbox"
-            checked={config.enabled}
-            onChange={handleToggleFirewall}
-          />
-          <span className="toggle-slider"></span>
-        </label>
-      </div>
+        <div className={`firewall-status ${config.enabled ? 'firewall-active' : ''}`}>
+          <div className="status-indicator"></div>
+          <span>Firewall {config.enabled ? 'Active' : 'Inactive'}</span>
+          <label className="firewall-toggle">
+            <input
+              type="checkbox"
+              checked={config.enabled}
+              onChange={handleToggleFirewall}
+              disabled={updatePending}
+            />
+            <span className="toggle-slider"></span>
+          </label>
+        </div>
         <button
           onClick={() => setIsModalOpen(true)}
           className="add-rule-button"
+          disabled={updatePending}
         >
           <Plus size={20} /> Add Rule
         </button>
       </div>
 
-      {config.rules.length === 0 ? (
+      {rules.length === 0 ? (
         <div className="no-rules">
           <AlertTriangle size={32} color="#00f6ff" />
           <p>No firewall rules have been defined yet. Click "Add Rule" to create your first rule.</p>
@@ -193,7 +322,7 @@ const Firewall: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {config.rules.map((rule) => (
+              {rules.map((rule) => (
                 <tr key={rule.id}>
                   <td>{rule.name}</td>
                   <td>{rule.src}</td>
@@ -208,7 +337,11 @@ const Firewall: React.FC = () => {
                   </td>
                   <td>
                     <div className="actions-column">
-                      <div className="action-icon delete-icon" onClick={() => handleDeleteRule(rule.id)}>
+                      <div 
+                        className="action-icon delete-icon" 
+                        onClick={() => !updatePending && handleDeleteRule(rule.id)}
+                        style={{ opacity: updatePending ? 0.5 : 1 }}
+                      >
                         <Trash2 size={18} />
                       </div>
                     </div>
@@ -220,7 +353,7 @@ const Firewall: React.FC = () => {
         </div>
       )}
 
-      {/* Add Rule Modal */}
+      {/* Add Rule Modal - Lazy loaded */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -279,17 +412,19 @@ const Firewall: React.FC = () => {
                     type="checkbox"
                     id="enabled"
                     name="enabled"
-                    checked={newRule.enabled}
+                    checked={newRule.enabled ?? true}
                     onChange={handleInputChange}
                   />
                   <label htmlFor="enabled">Enabled</label>
                 </div>
               </div>
               <div className="modal-actions">
-                <button type="button" onClick={() => setIsModalOpen(false)}>
+                <button type="button" onClick={() => setIsModalOpen(false)} disabled={updatePending}>
                   Cancel
                 </button>
-                <button type="submit">Add Rule</button>
+                <button type="submit" disabled={updatePending}>
+                  {updatePending ? 'Adding...' : 'Add Rule'}
+                </button>
               </div>
             </form>
           </div>

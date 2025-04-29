@@ -45,17 +45,17 @@
 }
 
 .status-indicator {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: #00f6ff; 
-  box-shadow: 0 0 8px rgba(0, 246, 255, 0.6);
+  width: 1px;
+  height: 15px;
+  border-radius: 100%;
+  background-color: #ff0000; /* Red for inactive */
+  box-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
   animation: pulse 2s infinite;
 }
 
 .firewall-active .status-indicator {
-  background-color: #ff0000; /* Cyan for active */
-  box-shadow: 0 0 8px rgba(246, 0, 0, 0.6);
+  background-color: #00f6ff; /* Cyan for active */
+  box-shadow: 0 0 8px rgba(0, 246, 255, 0.6);
 }
 
 @keyframes pulse {
