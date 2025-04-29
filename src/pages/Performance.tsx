@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import {
   Card,
@@ -22,7 +22,7 @@ import {
   PerformanceData,
   HistoryEntry,
 } from '../lib/performance-api';
-import { savePerformanceData, getHistoricalData, clearOldData } from '../lib/db'; // Import DB functions
+import { savePerformanceData, getHistoricalData, saveTargetIp, getTargetIp, clearOldData } from '../lib/db';
 import { lazy, Suspense } from 'react';
 
 const PerformanceChart = lazy(() =>
@@ -53,8 +53,18 @@ const MetricCardSkeleton = () => (
 const Performance = () => {
   const [testForm, setTestForm] = useState({ targetIp: '8.8.8.8', duration: 30 });
   const [testing, setTesting] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]); // State for historical data
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [currentTargetIp, setCurrentTargetIp] = useState<string | null>(null);
   const { toast } = useToast();
+
+  // Load last tested IP from IndexedDB on mount
+  useEffect(() => {
+    const fetchTargetIp = async () => {
+      const ip = await getTargetIp();
+      setCurrentTargetIp(ip || '192.168.1.1'); // Default to gateway
+    };
+    fetchTargetIp();
+  }, []);
 
   // Fetch live data with SWR
   const {
@@ -62,59 +72,40 @@ const Performance = () => {
     error,
     isValidating,
     mutate,
-  } = useSWR<PerformanceData>(
-    'performance-data',
-    async () => {
-      try {
-        const res = await getPerformance();
-        // Save metrics to IndexedDB
-        await savePerformanceData(res.metrics);
-        return {
-          metrics: {
-            latency: res.metrics.latency || 0,
-            packetLoss: res.metrics.packetLoss || 0,
-            throughput: res.metrics.throughput || 0,
-          },
-          history: [], // Ignore server history; we'll use IndexedDB
-          qos: { enabled: res.qos?.enabled ?? false },
-        };
-      } catch (err) {
-        console.error('Fetch error:', err);
-        return EMPTY_DATA;
-      }
+  } = useSWR<PerformanceData>('performance-data', getPerformance, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: true,
+    refreshInterval: 30000,
+    dedupingInterval: 10000,
+    focusThrottleInterval: 30000,
+    errorRetryInterval: 5000,
+    errorRetryCount: 3,
+    loadingTimeout: 3000,
+    onSuccess: async (res) => {
+      await savePerformanceData(res.metrics);
     },
-    {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: true,
-      refreshInterval: 30000,
-      dedupingInterval: 10000,
-      focusThrottleInterval: 30000,
-      errorRetryInterval: 5000,
-      errorRetryCount: 3,
-      loadingTimeout: 3000,
-      onError: () =>
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load performance data',
-        }),
-    }
-  );
+    onError: () =>
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to load performance data',
+      }),
+  });
 
-  // Fetch historical data from IndexedDB on mount and when new data is saved
+  // Fetch historical data from IndexedDB
   useEffect(() => {
     const fetchHistory = async () => {
       const historicalData = await getHistoricalData(50);
       setHistory(historicalData);
     };
     fetchHistory();
-  }, [data.metrics]); // Update history when new metrics are fetched
+  }, [data.metrics]);
 
-  // Optional: Periodically clear old data (e.g., every 24 hours)
+  // Clear old data daily
   useEffect(() => {
     const interval = setInterval(() => {
-      clearOldData(7); // Clear data older than 7 days
-    }, 24 * 60 * 60 * 1000); // Run daily
+      clearOldData(7);
+    }, 24 * 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -140,6 +131,8 @@ const Performance = () => {
     try {
       setTesting(true);
       await updatePerformance({ action: 'test', targetIp, duration });
+      await saveTargetIp(targetIp); // Save to IndexedDB
+      setCurrentTargetIp(targetIp); // Update label
       toast({ title: 'Success', description: 'Network test started' });
       mutate();
     } catch {
@@ -203,6 +196,14 @@ const Performance = () => {
         </div>
       </div>
 
+      {/* Current Tested IP Label */}
+      <div className="bg-white p-4 rounded-lg shadow-sm">
+        <p className="text-sm font-medium text-gray-700">
+          Current Tested IP: <span className="font-bold">{currentTargetIp || 'Loading...'}</span>
+        </p>
+      </div>
+
+      {/* Metrics Panel */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {['latency', 'packetLoss', 'throughput'].map((metric) => {
           const colors = {
@@ -247,7 +248,7 @@ const Performance = () => {
           <CardContent>
             <div className="h-80">
               <Suspense fallback={<div className="h-full bg-gray-100 animate-pulse rounded-md" />}>
-                <PerformanceChart history={history} /> {/* Use local history state */}
+                <PerformanceChart history={history} />
               </Suspense>
             </div>
           </CardContent>

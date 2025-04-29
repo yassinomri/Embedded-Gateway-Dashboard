@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,7 @@ const formatTimestamp = (timestamp: string) => {
 
 const PacketAnalyzer = () => {
   const [packets, setPackets] = useState<PacketData[]>([]);
-  const [isCapturing, setIsCapturing] = useState<boolean>(true); // capturing enabled by default
+  const [isCapturing, setIsCapturing] = useState<boolean>(true);
   const [selectedPacket, setSelectedPacket] = useState<PacketData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -35,8 +34,8 @@ const PacketAnalyzer = () => {
 
   useEffect(() => {
     if (isCapturing) {
-      capturePackets(); // capture immediately
-      intervalRef.current = setInterval(capturePackets, 60000); // capture every 60 seconds
+      capturePackets();
+      intervalRef.current = setInterval(capturePackets, 60000);
     }
 
     return () => {
@@ -44,7 +43,7 @@ const PacketAnalyzer = () => {
         clearInterval(intervalRef.current);
       }
     };
-  }, [isCapturing]); // only run this when isCapturing changes
+  }, [isCapturing]);
 
   const toggleCapturing = () => {
     setIsCapturing((prev) => !prev);
@@ -55,12 +54,28 @@ const PacketAnalyzer = () => {
   };
 
   return (
-    <div className="packet-analyzer-container">
-      <header className="packet-analyzer-header">
-        <h1>Packet Analyzer</h1>
+    <div className="w-full px-4 py-6 bg-gray-50 space-y-6">
+      <header className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+        <h1 className="text-3xl font-bold text-gray-800">Packet Analyzer</h1>
+        <Button 
+          className="capture-button"
+          onClick={toggleCapturing}
+          aria-label={isCapturing ? 'Stop Capturing' : 'Resume Capturing'}
+          variant="default"
+        >
+          {isCapturing ? (
+            <>
+              <Pause className="mr-2 h-4 w-4" /> Stop Capturing
+            </>
+          ) : (
+            <>
+              <Play className="mr-2 h-4 w-4" /> Resume Capturing
+            </>
+          )}
+        </Button>
       </header>
 
-      <div className="packet-table-container">
+      <div className="packet-table-container bg-white rounded-lg shadow-sm">
         <Table>
           <TableHeader>
             <TableRow>
@@ -133,10 +148,10 @@ const PacketAnalyzer = () => {
       </div>
 
       {selectedPacket && (
-        <section className="packet-details">
-          <h2>Packet Details</h2>
-          <div className="details-content">
-            <div className="detail-card">
+        <section className="packet-details bg-white p-4 rounded-lg shadow-sm">
+          <h2 className="text-lg font-bold text-gray-800">Packet Details</h2>
+          <div className="details-content grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="detail-card p-4 bg-gray-100 rounded-lg shadow-sm">
               <div className="detail-item">
                 <span className="detail-label">Time:</span>
                 <span className="detail-value">{formatTimestamp(selectedPacket.time)}</span>
@@ -150,7 +165,7 @@ const PacketAnalyzer = () => {
                 <span className="detail-value">{selectedPacket.dst}</span>
               </div>
             </div>
-            <div className="detail-card">
+            <div className="detail-card p-4 bg-gray-100 rounded-lg shadow-sm">
               <div className="detail-item">
                 <span className="detail-label">Info:</span>
                 <span className="detail-value">{selectedPacket.info}</span>
@@ -184,33 +199,14 @@ const PacketAnalyzer = () => {
         </section>
       )}
 
-      <footer className="status-bar">
-        <div className="status-indicator">
+      <footer className="status-bar bg-white p-4 rounded-lg shadow-sm flex justify-between items-center">
+        <div className="status-indicator flex items-center">
           <span className={`status-dot ${isCapturing ? 'active' : 'inactive'}`}></span>
           <span className="status-text">{isCapturing ? 'Capturing' : 'Paused'}</span>
         </div>
 
-        <div className="packet-count">
+        <div className="packet-count font-semibold text-gray-800">
           {packets.length} packet{packets.length !== 1 ? 's' : ''} captured
-        </div>
-
-        <div className="capture-button-container">
-          <Button 
-            className="capture-button"
-            onClick={toggleCapturing}
-            aria-label={isCapturing ? 'Stop Capturing' : 'Resume Capturing'}
-            variant="default"
-          >
-            {isCapturing ? (
-              <>
-                <Pause className="mr-2 h-4 w-4" /> Stop Capturing
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" /> Resume Capturing
-              </>
-            )}
-          </Button>
         </div>
       </footer>
     </div>

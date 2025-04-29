@@ -1,21 +1,21 @@
 import Dexie, { Table } from 'dexie';
 import { HistoryEntry } from '../lib/performance-api';
 
-// Define the database class
 class PerformanceDB extends Dexie {
   performanceData!: Table<HistoryEntry & { id?: number }>;
+  settings!: Table<{ key: string; value: string }>;
 
   constructor() {
     super('PerformanceDB');
-    this.version(1).stores({
+    this.version(2).stores({
       performanceData: '++id, time, latency, packetLoss, throughput',
+      settings: 'key',
     });
   }
 }
 
 const db = new PerformanceDB();
 
-// Function to save performance data
 export const savePerformanceData = async (metrics: {
   latency: number;
   packetLoss: number;
@@ -34,7 +34,6 @@ export const savePerformanceData = async (metrics: {
   }
 };
 
-// Function to get historical data (last N entries)
 export const getHistoricalData = async (limit: number = 50): Promise<HistoryEntry[]> => {
   try {
     return await db.performanceData
@@ -48,7 +47,6 @@ export const getHistoricalData = async (limit: number = 50): Promise<HistoryEntr
   }
 };
 
-// Optional: Function to clear old data (e.g., older than 7 days)
 export const clearOldData = async (days: number = 7) => {
   try {
     const threshold = new Date();
@@ -59,5 +57,23 @@ export const clearOldData = async (days: number = 7) => {
       .delete();
   } catch (error) {
     console.error('Error clearing old data:', error);
+  }
+};
+
+export const saveTargetIp = async (ip: string) => {
+  try {
+    await db.settings.put({ key: 'targetIp', value: ip });
+  } catch (error) {
+    console.error('Error saving target IP:', error);
+  }
+};
+
+export const getTargetIp = async (): Promise<string | null> => {
+  try {
+    const setting = await db.settings.get('targetIp');
+    return setting?.value || null;
+  } catch (error) {
+    console.error('Error fetching target IP:', error);
+    return null;
   }
 };
