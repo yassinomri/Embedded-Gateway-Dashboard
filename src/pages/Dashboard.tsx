@@ -1,172 +1,165 @@
-import React from "react";
-import { ChartLine, BarChart as LucideBarChart, PieChart as LucidePieChart } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  ResponsiveContainer, 
-  LineChart, 
-  BarChart as RechartsBarChart, 
-  PieChart as RechartsPieChart, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
-  Line as RechartsLine, 
-  Bar as RechartsBar, 
-  Pie as RechartsPie 
-} from 'recharts';
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, CheckCircle, Network, Shield, Activity, Search } from 'lucide-react';
 
-// Mock data for the charts
-const cpuData = [
-  { name: '00:00', value: 24 },
-  { name: '04:00', value: 13 },
-  { name: '08:00', value: 42 },
-  { name: '12:00', value: 65 },
-  { name: '16:00', value: 48 },
-  { name: '20:00', value: 30 },
-  { name: '24:00', value: 25 },
-];
+interface SystemOverview {
+  systemHealth: 'stable' | 'warning' | 'critical';
+  activeInterfaces: number;
+  firewallStatus: boolean;
+  criticalAlerts: number;
+  recentPerformance: { latency: number; throughput: number };
+  packetCaptures: number;
+}
 
-const memoryData = [
-  { name: '00:00', used: 410, total: 1024 },
-  { name: '04:00', used: 380, total: 1024 },
-  { name: '08:00', used: 560, total: 1024 },
-  { name: '12:00', used: 890, total: 1024 },
-  { name: '16:00', used: 720, total: 1024 },
-  { name: '20:00', used: 550, total: 1024 },
-  { name: '24:00', used: 480, total: 1024 },
-];
+const Dashboard: React.FC = () => {
+  const [overview, setOverview] = useState<SystemOverview | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-const networkData = [
-  { name: '00:00', download: 32, upload: 12 },
-  { name: '04:00', download: 15, upload: 8 },
-  { name: '08:00', download: 45, upload: 26 },
-  { name: '12:00', download: 78, upload: 48 },
-  { name: '16:00', download: 52, upload: 30 },
-  { name: '20:00', download: 38, upload: 20 },
-  { name: '24:00', download: 28, upload: 16 },
-];
+  useEffect(() => {
+    const fetchOverview = async () => {
+      try {
+        setIsLoading(true);
+        // Simulated API call for high-level system overview
+        const mockOverview: SystemOverview = {
+          systemHealth: 'stable',
+          activeInterfaces: 2,
+          firewallStatus: true,
+          criticalAlerts: 0,
+          recentPerformance: { latency: 12.3, throughput: 420 },
+          packetCaptures: 4,
+        };
+        setOverview(mockOverview);
+      } catch (error) {
+        console.error('Error fetching overview:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-const resourceData = [
-  { name: 'CPU', value: 65 },
-  { name: 'Memory', value: 45 },
-  { name: 'Storage', value: 30 },
-];
+    fetchOverview();
+    const interval = setInterval(fetchOverview, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
 
-// Mock API function to fetch dashboard data
-const fetchDashboardData = async () => {
-  // In a real application, this would be an API call
-  await new Promise(resolve => setTimeout(resolve, 500)); // Simulate network delay
-  return {
-    cpuData,
-    memoryData,
-    networkData,
-    resourceData
+  const getHealthIcon = (health: string) => {
+    switch (health) {
+      case 'stable':
+        return <CheckCircle className="text-green-500" />;
+      case 'warning':
+        return <AlertTriangle className="text-yellow-500" />;
+      case 'critical':
+        return <AlertTriangle className="text-red-500" />;
+      default:
+        return null;
+    }
   };
-};
-
-export default function Dashboard() {
-  const { toast } = useToast();
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["dashboardData"],
-    queryFn: fetchDashboardData
-  });
-
-  if (isLoading) {
-    return <div className="container mx-auto p-6">Loading...</div>;
-  }
-
-  if (isError) {
-    return <div className="container mx-auto p-6">Error fetching data</div>;
-  }
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Dashboard Overview</h1>
-      
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>CPU Usage</CardTitle>
-            <CardDescription>CPU load over the last 24 hours</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={data.cpuData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <RechartsLine type="monotone" dataKey="value" stroke="#8884d8" />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+    <div className="min-h-screen bg-gray-100 p-6">
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">Network Monitoring Dashboard</h1>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Memory Usage</CardTitle>
-            <CardDescription>Memory consumption over time</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <RechartsBarChart data={data.memoryData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <RechartsBar dataKey="used" fill="#82ca9d" />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+      {isLoading ? (
+        <div className="text-center text-gray-600">Loading...</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* System Health */}
+          <div className="bg-white p-4 rounded-lg shadow flex items-center">
+            <div className="mr-4">{getHealthIcon(overview?.systemHealth || 'stable')}</div>
+            <div>
+              <h2 className="text-xl font-semibold">System Health</h2>
+              <p className="text-lg capitalize">{overview?.systemHealth}</p>
+              <p className="text-sm text-gray-600">{overview?.criticalAlerts} critical alerts</p>
+              <Link to="/network-performance" className="text-blue-600 hover:underline">
+                Check Status
+              </Link>
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Network Traffic</CardTitle>
-            <CardDescription>Upload and download rates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <RechartsBarChart data={data.networkData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <RechartsBar dataKey="download" fill="#8884d8" />
-                <RechartsBar dataKey="upload" fill="#82ca9d" />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+          {/* Network Interfaces */}
+          <div className="bg-white p-4 rounded-lg shadow flex items-center">
+            <Network className="text-blue-500 mr-4" />
+            <div>
+              <h2 className="text-xl font-semibold">Interfaces</h2>
+              <p className="text-lg">{overview?.activeInterfaces} active</p>
+              <Link to="/network-config/interfaces" className="text-blue-600 hover:underline">
+                Manage Interfaces
+              </Link>
+            </div>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Resource Allocation</CardTitle>
-            <CardDescription>Percentage of resource usage</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
-              <RechartsPieChart>
-                <Tooltip />
-                <RechartsPie 
-                  data={data.resourceData} 
-                  dataKey="value" 
-                  nameKey="name" 
-                  cx="50%" 
-                  cy="50%" 
-                  outerRadius={80}
-                  fill="#8884d8"
-                  label
-                />
-              </RechartsPieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+          {/* Firewall Status */}
+          <div className="bg-white p-4 rounded-lg shadow flex items-center">
+            <Shield className="text-green-500 mr-4" />
+            <div>
+              <h2 className="text-xl font-semibold">Firewall</h2>
+              <p className="text-lg">{overview?.firewallStatus ? 'Active' : 'Inactive'}</p>
+              <Link to="/firewall-rules" className="text-blue-600 hover:underline">
+                View Rules
+              </Link>
+            </div>
+          </div>
+
+          {/* Recent Performance */}
+          <div className="bg-white p-4 rounded-lg shadow flex items-center">
+            <Activity className="text-purple-500 mr-4" />
+            <div>
+              <h2 className="text-xl font-semibold">Performance</h2>
+              <p className="text-sm text-gray-600">
+                Latency: {overview?.recentPerformance.latency.toFixed(1)} ms | Throughput:{' '}
+                {overview?.recentPerformance.throughput.toFixed(0)} Mbps
+              </p>
+              <Link to="/network-performance" className="text-blue-600 hover:underline">
+                Test Performance
+              </Link>
+            </div>
+          </div>
+
+          {/* Packet Analyzer */}
+          <div className="bg-white p-4 rounded-lg shadow flex items-center">
+            <Search className="text-orange-500 mr-4" />
+            <div>
+              <h2 className="text-xl font-semibold">Packet Analyzer</h2>
+              <p className="text-lg">{overview?.packetCaptures} recent captures</p>
+              <Link to="/packet-analyzer" className="text-blue-600 hover:underline">
+                Analyze Packets
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="bg-white p-4 rounded-lg shadow col-span-1 md:col-span-2 lg:col-span-3">
+            <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
+            <div className="flex flex-wrap gap-4">
+              <Link
+                to="/network-config/interfaces"
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Configure Interfaces
+              </Link>
+              <Link
+                to="/firewall-rules"
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                Manage Firewall
+              </Link>
+              <Link
+                to="/network-performance/test"
+                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+              >
+                Run Performance Test
+              </Link>
+              <Link
+                to="/packet-analyzer"
+                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
+              >
+                Start Packet Capture
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default Dashboard;
