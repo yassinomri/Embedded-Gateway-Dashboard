@@ -273,16 +273,22 @@ const handleToggleFirewall = async () => {
   }
 
   return (
-    <div className="firewall-container">
-      <h1 className="firewall-title">
-        <Shield size={28} color="#00f6ff" />
-        Firewall Rules
-      </h1>
-      
+    <div className="page-container">
+      <header className="page-header">
+        <h1>
+          <Shield size={28} color="#00f6ff" />
+          Firewall Rules
+        </h1>
+      </header>
+  
       <div className="firewall-header">
-        <div className={`firewall-status ${config.enabled ? 'firewall-active' : ''}`}>
-          <div className="status-indicator"></div>
-          <span>Firewall {config.enabled ? 'Active' : 'Inactive'}</span>
+        <div className={`firewall-status ${config.enabled ? 'firewall-active' : 'firewall-inactive'}`}>
+          <div className="status-indicator">
+            <span className={`status-dot ${config.enabled ? 'active' : 'inactive'}`}></span>
+            <span className="status-text">
+              Firewall {config.enabled ? 'Active' : 'Inactive'}
+            </span>
+          </div>
           <label className="firewall-toggle">
             <input
               type="checkbox"
@@ -295,21 +301,21 @@ const handleToggleFirewall = async () => {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="add-rule-button"
+          className="primary-button add-rule-button"
           disabled={updatePending}
         >
           <Plus size={20} /> Add Rule
         </button>
       </div>
-
+  
       {rules.length === 0 ? (
         <div className="no-rules">
           <AlertTriangle size={32} color="#00f6ff" />
           <p>No firewall rules have been defined yet. Click "Add Rule" to create your first rule.</p>
         </div>
       ) : (
-        <div className="firewall-table-container">
-          <table className="firewall-table">
+        <div className="table-container">
+          <table className="styled-table">
             <thead>
               <tr>
                 <th>Name</th>
@@ -330,20 +336,25 @@ const handleToggleFirewall = async () => {
                   <td>{rule.proto}</td>
                   <td className={`target-column ${getTargetClass(rule.target)}`}>{rule.target}</td>
                   <td>
-                    <Shield
-                      color={rule.enabled ? '#00f6ff' : '#ff0000'}
-                      size={20}
-                    />
+                    <div className="status-icon">
+                      <Shield
+                        color={rule.enabled ? '#00f6ff' : '#ff0000'}
+                        size={20}
+                      />
+                      <span className="status-label">
+                        {rule.enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </div>
                   </td>
                   <td>
                     <div className="actions-column">
-                      <div 
-                        className="action-icon delete-icon" 
+                      <button
+                        className="action-icon delete-icon"
                         onClick={() => !updatePending && handleDeleteRule(rule.id)}
-                        style={{ opacity: updatePending ? 0.5 : 1 }}
+                        disabled={updatePending}
                       >
                         <Trash2 size={18} />
-                      </div>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -352,16 +363,17 @@ const handleToggleFirewall = async () => {
           </table>
         </div>
       )}
-
-      {/* Add Rule Modal - Lazy loaded */}
+  
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal-content">
-            <h2>
-              <Plus size={24} color="#00f6ff" />
-              Add New Rule
-            </h2>
-            <form onSubmit={handleAddRule}>
+          <div className="modal">
+            <header className="modal-header">
+              <h2>
+                <Plus size={24} color="#00f6ff" />
+                Add New Rule
+              </h2>
+            </header>
+            <form onSubmit={handleAddRule} className="modal-form">
               <div className="form-group">
                 <label htmlFor="name">Rule Name</label>
                 <input
@@ -418,14 +430,23 @@ const handleToggleFirewall = async () => {
                   <label htmlFor="enabled">Enabled</label>
                 </div>
               </div>
-              <div className="modal-actions">
-                <button type="button" onClick={() => setIsModalOpen(false)} disabled={updatePending}>
+              <footer className="modal-footer">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="secondary-button"
+                  disabled={updatePending}
+                >
                   Cancel
                 </button>
-                <button type="submit" disabled={updatePending}>
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={updatePending}
+                >
                   {updatePending ? 'Adding...' : 'Add Rule'}
                 </button>
-              </div>
+              </footer>
             </form>
           </div>
         </div>
