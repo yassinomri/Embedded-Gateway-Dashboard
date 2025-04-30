@@ -163,6 +163,41 @@ export const apiClient = {
   },
 
   updateDhcpDns: async (config: DhcpDnsConfig): Promise<void> => {
+    const url = "http://localhost:8080/cgi-bin/dhcp_dns.cgi";
+    console.log("updateDhcpDns Request:", { url, config });
     console.log("Updating DHCP & DNS config:", config);
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(config),
+    });
+
+    const responseText = await response.text();
+    console.log("updateDhcpDns Response:", {
+      url,
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    }
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    }
+    catch (e) {
+      throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Body: ${responseText}`);
+    }
+    // Validate response format
+    if (typeof result.status !== "string" || typeof result.message !== "string") {
+      throw new Error(`Invalid response format: ${responseText}`);
+    }
+    return result;
   }
 };

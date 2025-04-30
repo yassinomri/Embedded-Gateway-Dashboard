@@ -26,7 +26,7 @@ export interface DhcpDnsConfig {
   dhcpv6: string;
   ra: string;
   raSlaac: boolean;
-  raFlags: string[];
+  //raFlags: string[];
   primaryDns: string;
   secondaryDns: string;
 }

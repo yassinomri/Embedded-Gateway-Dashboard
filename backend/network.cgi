@@ -84,6 +84,10 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         echo "$(date): POST response sent: $RESPONSE" >> /tmp/network_cgi.log
     fi
     exit 0
+
+    uci commit network 2>/dev/null
+    /etc/init.d/network reload 2>/dev/null
+    RESPONSE="{\"status\": \"success\", \"message\": \"Updated $INTERFACE to IP: $IP, Gateway: ${GATEWAY:-none}\"}"
 fi
 
 # Unknown method

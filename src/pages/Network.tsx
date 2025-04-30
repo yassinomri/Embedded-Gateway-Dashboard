@@ -99,7 +99,6 @@ export default function Network() {
       dhcpv6: 'server',
       ra: 'server',
       raSlaac: false,
-      raFlags: [],
       primaryDns: '',
       secondaryDns: '',
     }
@@ -176,12 +175,17 @@ export default function Network() {
   };
 
   const validateDhcpDns = () => {
+    const startOctet = parseInt(rangeStartLastOctet, 10);
+    const endOctet = parseInt(rangeEndLastOctet, 10);
+  
     return (
-      (!dhcpDnsConfig.dhcpEnabled || 
-        (isValidIP(dhcpDnsConfig.rangeStart) && isValidIP(dhcpDnsConfig.rangeEnd))) &&
+      (!dhcpDnsConfig.dhcpEnabled ||
+        (isValidLastOctet(rangeStartLastOctet) &&
+          isValidLastOctet(rangeEndLastOctet) &&
+          endOctet >= startOctet)) && // Ensure end range >= start range
       (!dhcpDnsConfig.primaryDns || isValidIP(dhcpDnsConfig.primaryDns)) &&
       (!dhcpDnsConfig.secondaryDns || isValidIP(dhcpDnsConfig.secondaryDns)) &&
-      dhcpDnsConfig.leaseTime.trim() !== '' && // Ensure leasetime is not empty
+      dhcpDnsConfig.leaseTime.trim() !== '' && // Ensure lease time is not empty
       ['server', 'relay', 'disabled'].includes(dhcpDnsConfig.dhcpv6) && // Validate dhcpv6 mode
       ['server', 'relay', 'disabled'].includes(dhcpDnsConfig.ra) // Validate RA mode
     );
@@ -190,6 +194,11 @@ export default function Network() {
   const [subnet, setSubnet] = useState("192.168.1"); // Example subnet
   const [rangeStartLastOctet, setRangeStartLastOctet] = useState("100");
   const [rangeEndLastOctet, setRangeEndLastOctet] = useState("150");
+  const [dhcpv6, setDhcpv6] = useState("server");
+  const [ra, setRa] = useState("server");
+  const [raSlaac, setRaSlaac] = useState(false);
+  const [primaryDns, setPrimaryDns] = useState("");
+  const [secondaryDns, setSecondaryDns] = useState("");
 
   // Populate initial values from the backend
   useEffect(() => {
@@ -198,10 +207,16 @@ export default function Network() {
       const subnetPrefix = subnetParts.slice(0, 3).join("."); // Join the first three octets
       const startLastOctet = subnetParts[3]; // Extract the last octet
       const endLastOctet = dhcpDnsConfig.rangeEnd.split(".")[3]; // Extract the last octet of rangeEnd
-
+  
       setSubnet(subnetPrefix); // Set the read-only subnet
       setRangeStartLastOctet(startLastOctet); // Set the editable last octet
       setRangeEndLastOctet(endLastOctet); // Set the editable last octet
+      setDhcpv6(dhcpDnsConfig.dhcpv6);
+      setRa(dhcpDnsConfig.ra);
+      setRaSlaac(dhcpDnsConfig.raSlaac);
+      setPrimaryDns(dhcpDnsConfig.primaryDns || "");
+      setSecondaryDns(dhcpDnsConfig.secondaryDns || "");
+  
     }
   }, [dhcpDnsConfig]);
 
@@ -214,27 +229,43 @@ export default function Network() {
       return;
     }
   
+    const startOctet = parseInt(rangeStartLastOctet, 10);
+    const endOctet = parseInt(rangeEndLastOctet, 10);
+  
+    if (endOctet < startOctet) {
+      alert("End range must be greater than or equal to the start range.");
+      return;
+    }
+  
+    const limit = endOctet - startOctet + 1; // Calculate the limit
+  
     const updatedConfig = {
       ...dhcpDnsConfig,
       rangeStart,
       rangeEnd,
+      limit, // Include the calculated limit
+      dhcpv6,
+      ra,
+      raSlaac,
+      primaryDns,
+      secondaryDns, 
     };
   
     apiClient.updateDhcpDns(updatedConfig)
-    .then(() => {
-      toast({
-        title: "Success",
-        description: "DHCP & DNS configuration updated successfully.",
-        variant: "default", // Use "default" for success
+      .then(() => {
+        toast({
+          title: "Success",
+          description: "DHCP & DNS configuration updated successfully.",
+          variant: "default", // Use "default" for success
+        });
+      })
+      .catch((error) => {
+        toast({
+          title: "Error",
+          description: `Failed to update configuration: ${error.message}`,
+          variant: "destructive", // Use "destructive" for error
+        });
       });
-    })
-    .catch((error) => {
-      toast({
-        title: "Error",
-        description: `Failed to update configuration: ${error.message}`,
-        variant: "destructive", // Use "destructive" for error
-      });
-    });
   };
 
   
@@ -256,7 +287,6 @@ export default function Network() {
         dhcpv6: dhcpDnsData.dhcpv6 ?? 'server',
         ra: dhcpDnsData.ra ?? 'server',
         raSlaac: dhcpDnsData.raSlaac ?? false,
-        raFlags: dhcpDnsData.raFlags ?? [],
         primaryDns: dhcpDnsData.primaryDns ?? '',
         secondaryDns: dhcpDnsData.secondaryDns ?? '',
       });
@@ -635,41 +665,6 @@ export default function Network() {
                     />
                     <Label htmlFor="ra-slaac">Enable SLAAC</Label>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="ra-flags">RA Flags</Label>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="managed-config"
-                          className="custom-switch"
-                          checked={dhcpDnsConfig.raFlags.includes("managed-config")}
-                          onCheckedChange={(checked) => {
-                            const updatedFlags = checked
-                              ? [...dhcpDnsConfig.raFlags, "managed-config"]
-                              : dhcpDnsConfig.raFlags.filter((flag) => flag !== "managed-config");
-                            setDhcpDnsConfig({ ...dhcpDnsConfig, raFlags: updatedFlags });
-                          }}
-                          disabled={!dhcpDnsConfig.dhcpEnabled}
-                        />
-                        <Label htmlFor="managed-config">Managed Config</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="other-config"
-                          className="custom-switch"
-                          checked={dhcpDnsConfig.raFlags.includes("other-config")}
-                          onCheckedChange={(checked) => {
-                            const updatedFlags = checked
-                              ? [...dhcpDnsConfig.raFlags, "other-config"]
-                              : dhcpDnsConfig.raFlags.filter((flag) => flag !== "other-config");
-                            setDhcpDnsConfig({ ...dhcpDnsConfig, raFlags: updatedFlags });
-                          }}
-                          disabled={!dhcpDnsConfig.dhcpEnabled}
-                        />
-                        <Label htmlFor="other-config">Other Config</Label>
-                      </div>
-                    </div>
-                  </div>
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">DNS Settings</h3>
@@ -703,7 +698,7 @@ export default function Network() {
                 <Button
                   type="button"
                   className="custom-button"
-                  onClick={() => dhcpDnsMutation.mutate(dhcpDnsConfig)}
+                  onClick={handleSave}
                   disabled={!validateDhcpDns() || dhcpDnsMutation.isPending}
                 >
                   {dhcpDnsMutation.isPending ? "Saving..." : "Save DHCP & DNS Config"}

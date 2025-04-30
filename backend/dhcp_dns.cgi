@@ -100,31 +100,45 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     DHCPV6=$(echo "$POST_DATA" | sed -n 's/.*"dhcpv6"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
     RA=$(echo "$POST_DATA" | sed -n 's/.*"ra"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
     RA_SLAAC=$(echo "$POST_DATA" | sed -n 's/.*"raSlaac"[ ]*:[ ]*\(true\|false\).*/\1/p')
-    RA_FLAGS=$(echo "$POST_DATA" | sed -n 's/.*"raFlags"[ ]*:[ ]*\[\(.*\)\].*/\1/p' | tr -d '"')
     PRIMARY_DNS=$(echo "$POST_DATA" | sed -n 's/.*"primaryDns"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
     SECONDARY_DNS=$(echo "$POST_DATA" | sed -n 's/.*"secondaryDns"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
 
+
+    # Validate IP range
+    if [ -z "$RANGE_START" ] || [ -z "$RANGE_END" ] || [ "$RANGE_START" -lt 0 ] || [ "$RANGE_START" -gt 255 ] || [ "$RANGE_END" -lt 0 ] || [ "$RANGE_END" -gt 255 ]; then
+        echo "{\"status\": \"error\", \"message\": \"Invalid IP range\"}"
+        echo "$(date): Invalid IP range: RANGE_START=$RANGE_START, RANGE_END=$RANGE_END" >> $LOG_FILE
+        exit 1
+    fi
+
+    # Calculate the limit
+    LIMIT=$((RANGE_END - RANGE_START + 1))
+    if [ "$LIMIT" -le 0 ]; then
+        echo "{\"status\": \"error\", \"message\": \"Invalid range: end range must be greater than or equal to start range\"}"
+        echo "$(date): Invalid range: RANGE_START=$RANGE_START, RANGE_END=$RANGE_END, LIMIT=$LIMIT" >> $LOG_FILE
+        exit 1
+    fi
+
     # Update DHCP configuration
     [ "$DHCP_ENABLED" = "true" ] && uci set dhcp.lan.dhcpv4="server" || uci set dhcp.lan.dhcpv4="disabled"
-    [ -n "$RANGE_START" ] && uci set dhcp.lan.start="$RANGE_START"
-    [ -n "$RANGE_END" ] && uci set dhcp.lan.limit="$RANGE_END"
+    uci set dhcp.lan.start="$RANGE_START" || { echo "Failed to set dhcp.lan.start"; exit 1; }
+    uci set dhcp.lan.limit="$LIMIT" || { echo "Failed to set dhcp.lan.limit"; exit 1; }
     [ -n "$LEASE_TIME" ] && uci set dhcp.lan.leasetime="$LEASE_TIME"
     [ -n "$DHCPV6" ] && uci set dhcp.lan.dhcpv6="$DHCPV6"
     [ -n "$RA" ] && uci set dhcp.lan.ra="$RA"
     [ "$RA_SLAAC" = "true" ] && uci set dhcp.lan.ra_slaac="1" || uci set dhcp.lan.ra_slaac="0"
-    [ -n "$RA_FLAGS" ] && uci set dhcp.lan.ra_flags="$RA_FLAGS"
-
-    # Update DNS configuration
     DNS_LIST=""
     [ -n "$PRIMARY_DNS" ] && DNS_LIST="$PRIMARY_DNS"
     [ -n "$SECONDARY_DNS" ] && DNS_LIST="$DNS_LIST $SECONDARY_DNS"
     [ -n "$DNS_LIST" ] && uci set network.lan.dns="$DNS_LIST"
 
+
     # Commit changes and reload services
     uci commit dhcp
+    /etc/init.d/dnsmasq restart || { echo "Failed to restart dnsmasq"; exit 1; }
+
     uci commit network
-    /etc/init.d/dnsmasq restart
-    /etc/init.d/network reload
+    /etc/init.d/network reload || { echo "Failed to reload network"; exit 1; }
 
     # Send success response
     RESPONSE="{\"status\": \"success\", \"message\": \"DHCP & DNS configuration updated successfully\"}"
