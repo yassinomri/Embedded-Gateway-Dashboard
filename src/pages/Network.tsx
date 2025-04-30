@@ -90,10 +90,16 @@ export default function Network() {
       dhcpEnabled: false,
       rangeStart: '',
       rangeEnd: '',
+      leaseTime: '3600', 
+      dhcpv6: 'server',
+      ra: 'server',
+      raSlaac: false,
+      raFlags: [],
       primaryDns: '',
       secondaryDns: '',
     }
   );
+  
 
   // Mutation for updating eth0
   const interfaceMutation = useMutation({
@@ -149,6 +155,7 @@ export default function Network() {
       });
     },
   });
+  
 
   // Validation functions
   const validateInterface = (data: { address: string; gateway: string }) => {
@@ -165,9 +172,13 @@ export default function Network() {
 
   const validateDhcpDns = () => {
     return (
-      (!dhcpDnsConfig.dhcpEnabled || (isValidIP(dhcpDnsConfig.rangeStart) && isValidIP(dhcpDnsConfig.rangeEnd))) &&
+      (!dhcpDnsConfig.dhcpEnabled || 
+        (isValidIP(dhcpDnsConfig.rangeStart) && isValidIP(dhcpDnsConfig.rangeEnd))) &&
       (!dhcpDnsConfig.primaryDns || isValidIP(dhcpDnsConfig.primaryDns)) &&
-      (!dhcpDnsConfig.secondaryDns || isValidIP(dhcpDnsConfig.secondaryDns))
+      (!dhcpDnsConfig.secondaryDns || isValidIP(dhcpDnsConfig.secondaryDns)) &&
+      dhcpDnsConfig.leaseTime.trim() !== '' && // Ensure leasetime is not empty
+      ['server', 'relay', 'disabled'].includes(dhcpDnsConfig.dhcpv6) && // Validate dhcpv6 mode
+      ['server', 'relay', 'disabled'].includes(dhcpDnsConfig.ra) // Validate RA mode
     );
   };
 
@@ -180,7 +191,18 @@ export default function Network() {
 
   useEffect(() => {
     if (dhcpDnsData) {
-      setDhcpDnsConfig(dhcpDnsData);
+      setDhcpDnsConfig({
+        dhcpEnabled: dhcpDnsData.dhcpEnabled ?? false,
+        rangeStart: dhcpDnsData.rangeStart ?? '',
+        rangeEnd: dhcpDnsData.rangeEnd ?? '',
+        leaseTime: dhcpDnsData.leaseTime ?? '12h',
+        dhcpv6: dhcpDnsData.dhcpv6 ?? 'server',
+        ra: dhcpDnsData.ra ?? 'server',
+        raSlaac: dhcpDnsData.raSlaac ?? false,
+        raFlags: dhcpDnsData.raFlags ?? [],
+        primaryDns: dhcpDnsData.primaryDns ?? '',
+        secondaryDns: dhcpDnsData.secondaryDns ?? '',
+      });
     }
   }, [dhcpDnsData]);
 
@@ -487,6 +509,98 @@ export default function Network() {
                         dhcpDnsConfig.rangeEnd && (
                           <p className="text-red-500 text-xs">Invalid IP address</p>
                         )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="leasetime">Lease Time</Label>
+                      <Input
+                        id="leasetime"
+                        placeholder="12h"
+                        value={dhcpDnsConfig.leaseTime}
+                        onChange={(e) => setDhcpDnsConfig({ ...dhcpDnsConfig, leaseTime: e.target.value })}
+                        disabled={!dhcpDnsConfig.dhcpEnabled}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">IPv6 Settings</h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="dhcpv6">DHCPv6 Mode</Label>
+                    <Select
+                      value={dhcpDnsConfig.dhcpv6}
+                      onValueChange={(value) => setDhcpDnsConfig({ ...dhcpDnsConfig, dhcpv6: value })}
+                      disabled={!dhcpDnsConfig.dhcpEnabled}
+                    >
+                      <SelectTrigger id="dhcpv6">
+                        <SelectValue placeholder="Select DHCPv6 mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="server">Server</SelectItem>
+                        <SelectItem value="relay">Relay</SelectItem>
+                        <SelectItem value="disabled">Disabled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ra">Router Advertisement Mode</Label>
+                    <Select
+                      value={dhcpDnsConfig.ra}
+                      onValueChange={(value) => setDhcpDnsConfig({ ...dhcpDnsConfig, ra: value })}
+                      disabled={!dhcpDnsConfig.dhcpEnabled}
+                    >
+                      <SelectTrigger id="ra">
+                        <SelectValue placeholder="Select RA mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="server">Server</SelectItem>
+                        <SelectItem value="relay">Relay</SelectItem>
+                        <SelectItem value="disabled">Disabled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="ra-slaac"
+                      className="custom-switch"
+                      checked={dhcpDnsConfig.raSlaac}
+                      onCheckedChange={(checked) => setDhcpDnsConfig({ ...dhcpDnsConfig, raSlaac: checked })}
+                      disabled={!dhcpDnsConfig.dhcpEnabled}
+                    />
+                    <Label htmlFor="ra-slaac">Enable SLAAC</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ra-flags">RA Flags</Label>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="managed-config"
+                          className="custom-switch"
+                          checked={dhcpDnsConfig.raFlags.includes("managed-config")}
+                          onCheckedChange={(checked) => {
+                            const updatedFlags = checked
+                              ? [...dhcpDnsConfig.raFlags, "managed-config"]
+                              : dhcpDnsConfig.raFlags.filter((flag) => flag !== "managed-config");
+                            setDhcpDnsConfig({ ...dhcpDnsConfig, raFlags: updatedFlags });
+                          }}
+                          disabled={!dhcpDnsConfig.dhcpEnabled}
+                        />
+                        <Label htmlFor="managed-config">Managed Config</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="other-config"
+                          className="custom-switch"
+                          checked={dhcpDnsConfig.raFlags.includes("other-config")}
+                          onCheckedChange={(checked) => {
+                            const updatedFlags = checked
+                              ? [...dhcpDnsConfig.raFlags, "other-config"]
+                              : dhcpDnsConfig.raFlags.filter((flag) => flag !== "other-config");
+                            setDhcpDnsConfig({ ...dhcpDnsConfig, raFlags: updatedFlags });
+                          }}
+                          disabled={!dhcpDnsConfig.dhcpEnabled}
+                        />
+                        <Label htmlFor="other-config">Other Config</Label>
+                      </div>
                     </div>
                   </div>
                 </div>

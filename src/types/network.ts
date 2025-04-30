@@ -22,6 +22,11 @@ export interface DhcpDnsConfig {
   dhcpEnabled: boolean;
   rangeStart: string;
   rangeEnd: string;
+  leaseTime: string; 
+  dhcpv6: string;
+  ra: string;
+  raSlaac: boolean;
+  raFlags: string[];
   primaryDns: string;
   secondaryDns: string;
 }

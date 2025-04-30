@@ -112,10 +112,16 @@ export const apiClient = {
       rangeEnd: "192.168.1.200",
       primaryDns: "8.8.8.8",
       secondaryDns: "8.8.4.4",
+      leaseTime: '86400', // 1 day in seconds
+      dhcpv6: "enabled",
+      ra: "enabled",
+      raSlaac: true,
+      raFlags: ["managed", "other"],
+
     };
   },
 
   updateDhcpDns: async (config: DhcpDnsConfig): Promise<void> => {
     console.log("Updating DHCP & DNS config:", config);
-  },
+  }
 };
