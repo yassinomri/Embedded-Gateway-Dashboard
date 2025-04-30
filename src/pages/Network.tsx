@@ -30,6 +30,11 @@ function isValidPassword(password: string) {
   return password.length >= 8 && password.length <= 63;
 }
 
+const isValidLastOctet = (octet: string): boolean => {
+  const num = parseInt(octet, 10);
+  return !isNaN(num) && num >= 0 && num <= 255;
+};
+
 export default function Network() {
   // Query for interfaces
   const { data: networkData, isLoading: isLoadingInterfaces, error: interfacesError } = useQuery<NetworkData>({
@@ -181,6 +186,58 @@ export default function Network() {
       ['server', 'relay', 'disabled'].includes(dhcpDnsConfig.ra) // Validate RA mode
     );
   };
+
+  const [subnet, setSubnet] = useState("192.168.1"); // Example subnet
+  const [rangeStartLastOctet, setRangeStartLastOctet] = useState("100");
+  const [rangeEndLastOctet, setRangeEndLastOctet] = useState("150");
+
+  // Populate initial values from the backend
+  useEffect(() => {
+    if (dhcpDnsConfig) {
+      const subnetParts = dhcpDnsConfig.rangeStart.split(".");
+      const subnetPrefix = subnetParts.slice(0, 3).join("."); // Join the first three octets
+      const startLastOctet = subnetParts[3]; // Extract the last octet
+      const endLastOctet = dhcpDnsConfig.rangeEnd.split(".")[3]; // Extract the last octet of rangeEnd
+
+      setSubnet(subnetPrefix); // Set the read-only subnet
+      setRangeStartLastOctet(startLastOctet); // Set the editable last octet
+      setRangeEndLastOctet(endLastOctet); // Set the editable last octet
+    }
+  }, [dhcpDnsConfig]);
+
+  const handleSave = () => {
+    const rangeStart = `${subnet}.${rangeStartLastOctet}`;
+    const rangeEnd = `${subnet}.${rangeEndLastOctet}`;
+  
+    if (!isValidLastOctet(rangeStartLastOctet) || !isValidLastOctet(rangeEndLastOctet)) {
+      alert("Invalid IP range. Please ensure the last octet is between 0 and 255.");
+      return;
+    }
+  
+    const updatedConfig = {
+      ...dhcpDnsConfig,
+      rangeStart,
+      rangeEnd,
+    };
+  
+    apiClient.updateDhcpDns(updatedConfig)
+    .then(() => {
+      toast({
+        title: "Success",
+        description: "DHCP & DNS configuration updated successfully.",
+        variant: "default", // Use "default" for success
+      });
+    })
+    .catch((error) => {
+      toast({
+        title: "Error",
+        description: `Failed to update configuration: ${error.message}`,
+        variant: "destructive", // Use "destructive" for error
+      });
+    });
+  };
+
+  
 
   // Update state when query data changes
   useEffect(() => {
@@ -482,32 +539,42 @@ export default function Network() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="range-start">Start IP Range</Label>
-                      <Input
-                        id="range-start"
-                        placeholder="192.168.1.100"
-                        value={dhcpDnsConfig.rangeStart}
-                        onChange={(e) => setDhcpDnsConfig({ ...dhcpDnsConfig, rangeStart: e.target.value })}
-                        disabled={!dhcpDnsConfig.dhcpEnabled}
-                      />
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500">{subnet}.</span> {/* Read-only subnet */}
+                        <Input
+                          id="range-start"
+                          type="number"
+                          min="0"
+                          max="255"
+                          placeholder="100"
+                          value={rangeStartLastOctet}
+                          onChange={(e) => setRangeStartLastOctet(e.target.value)}
+                          disabled={!dhcpDnsConfig.dhcpEnabled}
+                        />
+                      </div>
                       {dhcpDnsConfig.dhcpEnabled &&
-                        !isValidIP(dhcpDnsConfig.rangeStart) &&
-                        dhcpDnsConfig.rangeStart && (
-                          <p className="text-red-500 text-xs">Invalid IP address</p>
+                        (!isValidLastOctet(rangeStartLastOctet) || rangeStartLastOctet === "") && (
+                          <p className="text-red-500 text-xs">Invalid last octet (must be 0-255)</p>
                         )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="range-end">End IP Range</Label>
-                      <Input
-                        id="range-end"
-                        placeholder="192.168.1.200"
-                        value={dhcpDnsConfig.rangeEnd}
-                        onChange={(e) => setDhcpDnsConfig({ ...dhcpDnsConfig, rangeEnd: e.target.value })}
-                        disabled={!dhcpDnsConfig.dhcpEnabled}
-                      />
+                      <div className="flex items-center space-x-2">
+                        <span className="text-gray-500">{subnet}.</span> {/* Read-only subnet */}
+                        <Input
+                          id="range-end"
+                          type="number"
+                          min="0"
+                          max="255"
+                          placeholder="150"
+                          value={rangeEndLastOctet}
+                          onChange={(e) => setRangeEndLastOctet(e.target.value)}
+                          disabled={!dhcpDnsConfig.dhcpEnabled}
+                        />
+                      </div>
                       {dhcpDnsConfig.dhcpEnabled &&
-                        !isValidIP(dhcpDnsConfig.rangeEnd) &&
-                        dhcpDnsConfig.rangeEnd && (
-                          <p className="text-red-500 text-xs">Invalid IP address</p>
+                        (!isValidLastOctet(rangeEndLastOctet) || rangeEndLastOctet === "") && (
+                          <p className="text-red-500 text-xs">Invalid last octet (must be 0-255)</p>
                         )}
                     </div>
                     <div className="space-y-2">
@@ -521,7 +588,7 @@ export default function Network() {
                       />
                     </div>
                   </div>
-                </div>
+                </div>           
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">IPv6 Settings</h3>
                   <div className="space-y-2">

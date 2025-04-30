@@ -1,4 +1,5 @@
 import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
+import { data } from "react-router-dom";
 
 export const apiClient = {
   getInterfaces: async (): Promise<NetworkData> => {
@@ -106,19 +107,59 @@ export const apiClient = {
   },
 
   getDhcpDns: async (): Promise<DhcpDnsConfig> => {
-    return {
-      dhcpEnabled: true,
-      rangeStart: "192.168.1.100",
-      rangeEnd: "192.168.1.200",
-      primaryDns: "8.8.8.8",
-      secondaryDns: "8.8.4.4",
-      leaseTime: '86400', // 1 day in seconds
-      dhcpv6: "enabled",
-      ra: "enabled",
-      raSlaac: true,
-      raFlags: ["managed", "other"],
 
-    };
+    const url = "http://localhost:8080/cgi-bin/dhcp_dns.cgi?option=get"
+    console.log("getDhcpDns Request:", { url, headers: { "Content-Type": "application/json" } });
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    console.log("getDhcpDns Response:", { 
+      url,
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    }
+
+    let data: DhcpDnsConfig;
+    try { 
+      data = JSON.parse(responseText);
+    }
+    catch (e) {
+      // Fallback: Extract first valid JSON object
+      const match = responseText.match(/\{[\s\S]*?\}(?=\s*\{|$)/);
+      if (match) {
+        try {
+          data = JSON.parse(match[0]);
+          console.log("getDhcpDns Fallback: Parsed first JSON object:", data);
+        } catch (fallbackError) {
+          throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Fallback failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}, Body: ${responseText}`);
+        }
+      } else {
+        throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, No valid JSON found, Body: ${responseText}`);
+      }
+    }
+    // Validate required fields
+  if (
+    typeof data.dhcpEnabled !== "boolean" ||
+    !data.rangeStart ||
+    !data.rangeEnd ||
+    !data.leaseTime ||
+    typeof data.dhcpv6 !== "string" ||
+    typeof data.ra !== "string"
+  ) {
+    throw new Error(`Invalid response format: ${responseText}`);
+  }
+    return data;
   },
 
   updateDhcpDns: async (config: DhcpDnsConfig): Promise<void> => {

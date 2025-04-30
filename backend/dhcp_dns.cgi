@@ -17,12 +17,35 @@ if [ "$REQUEST_METHOD" = "OPTIONS" ]; then
     exit 0
 fi
 
+# Function to calculate the subnet using ipcalc.sh
+get_subnet() {
+    local ip="$1"
+    local netmask="$2"
+    echo "$(date): get_subnet called with IP=$ip and NETMASK=$netmask" >> $LOG_FILE
+    local subnet=$(ipcalc.sh "$ip" "$netmask" | grep 'NETWORK=' | awk -F= '{print $2}' | awk -F/ '{print $1}')
+    echo "$(date): Calculated subnet in get_subnet: $subnet" >> $LOG_FILE
+    echo "$subnet"
+}  
+
 # Handle GET request to fetch DHCP & DNS configuration
 if [ "$REQUEST_METHOD" = "GET" ]; then
     echo "$(date): GET request" >> $LOG_FILE
 
+    # Fetch LAN IP and netmask
+    IP_ADDRESS=$(uci get network.lan.ipaddr 2>/dev/null || echo "192.168.1.1")
+    NETMASK=$(uci get network.lan.netmask 2>/dev/null || echo "255.255.255.0")
+    echo "$(date): IP_ADDRESS=$IP_ADDRESS, NETMASK=$NETMASK" >> $LOG_FILE
+
+    # Calculate the subnet
+    SUBNET=$(get_subnet "$IP_ADDRESS" "$NETMASK")
+    if [ -z "$SUBNET" ]; then
+        echo "$(date): Subnet calculation failed, falling back to default subnet" >> $LOG_FILE
+        SUBNET="${IP_ADDRESS%.*}.0"
+    fi
+    echo "$(date): SUBNET=$SUBNET" >> $LOG_FILE
+
     # Fetch DHCP configuration
-    DHCP_ENABLED=$(uci get dhcp.lan.ignore 2>/dev/null || echo "0") # Default to "0" (enabled)
+    DHCP_ENABLED=$(uci get dhcp.lan.dhcpv4 2>/dev/null || echo "server") # Default to "server" (enabled)
     RANGE_START=$(uci get dhcp.lan.start 2>/dev/null || echo "100") # Default to "100"
     RANGE_END=$(uci get dhcp.lan.limit 2>/dev/null || echo "150") # Default to "150"
     LEASE_TIME=$(uci get dhcp.lan.leasetime 2>/dev/null || echo "12h") # Default to "12h"
@@ -35,12 +58,17 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     PRIMARY_DNS=$(uci get network.lan.dns 2>/dev/null | awk '{print $1}' || echo "")
     SECONDARY_DNS=$(uci get network.lan.dns 2>/dev/null | awk '{print $2}' || echo "")
 
+    # Construct full IP addresses for rangeStart and rangeEnd
+    RANGE_START_FULL="${SUBNET%.*}.$RANGE_START"
+    ADJUSTED_RANGE_END=$((RANGE_START + RANGE_END - 1))
+    RANGE_END_FULL="${SUBNET%.*}.$ADJUSTED_RANGE_END"
+
     # Build JSON response
     JSON=$(cat <<EOF
 {
-  "dhcpEnabled": $([ "$DHCP_ENABLED" = "1" ] && echo "false" || echo "true"),
-  "rangeStart": "$RANGE_START",
-  "rangeEnd": "$RANGE_END",
+  "dhcpEnabled": $([ "$DHCP_ENABLED" = "server" ] && echo "true" || echo "false"),
+  "rangeStart": "$RANGE_START_FULL",
+  "rangeEnd": "$RANGE_END_FULL",
   "leaseTime": "$LEASE_TIME",
   "dhcpv6": "$DHCPV6",
   "ra": "$RA",
@@ -66,8 +94,8 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
 
     # Parse JSON data
     DHCP_ENABLED=$(echo "$POST_DATA" | sed -n 's/.*"dhcpEnabled"[ ]*:[ ]*\(true\|false\).*/\1/p')
-    RANGE_START=$(echo "$POST_DATA" | sed -n 's/.*"rangeStart"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-    RANGE_END=$(echo "$POST_DATA" | sed -n 's/.*"rangeEnd"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
+    RANGE_START=$(echo "$POST_DATA" | sed -n 's/.*"rangeStart"[ ]*:[ ]*"\([^"]*\)".*/\1/p' | awk -F. '{print $4}')
+    RANGE_END=$(echo "$POST_DATA" | sed -n 's/.*"rangeEnd"[ ]*:[ ]*"\([^"]*\)".*/\1/p' | awk -F. '{print $4}')
     LEASE_TIME=$(echo "$POST_DATA" | sed -n 's/.*"leaseTime"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
     DHCPV6=$(echo "$POST_DATA" | sed -n 's/.*"dhcpv6"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
     RA=$(echo "$POST_DATA" | sed -n 's/.*"ra"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
@@ -77,7 +105,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     SECONDARY_DNS=$(echo "$POST_DATA" | sed -n 's/.*"secondaryDns"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
 
     # Update DHCP configuration
-    uci set dhcp.lan.ignore=$([ "$DHCP_ENABLED" = "false" ] && echo "1" || echo "0")
+    [ "$DHCP_ENABLED" = "true" ] && uci set dhcp.lan.dhcpv4="server" || uci set dhcp.lan.dhcpv4="disabled"
     [ -n "$RANGE_START" ] && uci set dhcp.lan.start="$RANGE_START"
     [ -n "$RANGE_END" ] && uci set dhcp.lan.limit="$RANGE_END"
     [ -n "$LEASE_TIME" ] && uci set dhcp.lan.leasetime="$LEASE_TIME"
