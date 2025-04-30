@@ -282,23 +282,23 @@ const handleToggleFirewall = async () => {
       </header>
   
       <div className="firewall-header">
-        <div className={`firewall-status ${config.enabled ? 'firewall-active' : 'firewall-inactive'}`}>
-          <div className="status-indicator">
-            <span className={`status-dot ${config.enabled ? 'active' : 'inactive'}`}></span>
-            <span className="status-text">
-              Firewall {config.enabled ? 'Active' : 'Inactive'}
-            </span>
-          </div>
-          <label className="firewall-toggle">
-            <input
-              type="checkbox"
-              checked={config.enabled}
-              onChange={handleToggleFirewall}
-              disabled={updatePending}
-            />
-            <span className="toggle-slider"></span>
-          </label>
+      <div className={`firewall-status ${config.enabled ? 'firewall-active' : 'firewall-inactive'}`}>
+        <div className="status-indicator">
+          <span className={`status-dot ${config.enabled ? 'active' : 'inactive'}`}></span>
+          <span className="status-text">
+            Firewall {config.enabled ? 'Active' : 'Inactive'}
+          </span>
         </div>
+        <label className="firewall-toggle">
+          <input
+            type="checkbox"
+            checked={config.enabled}
+            onChange={handleToggleFirewall}
+            disabled={updatePending}
+          />
+          <span className="toggle-slider"></span>
+        </label>
+      </div>
         <button
           onClick={() => setIsModalOpen(true)}
           className="primary-button add-rule-button"
