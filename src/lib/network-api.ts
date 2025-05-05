@@ -199,5 +199,20 @@ export const apiClient = {
       throw new Error(`Invalid response format: ${responseText}`);
     }
     return result;
-  }
+  },
+
+  rebootSystem: async (): Promise<void> => {
+    const url = "http://localhost:8080/cgi-bin/reboot.cgi";
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const responseText = await response.text();
+      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    }
+  },
 };

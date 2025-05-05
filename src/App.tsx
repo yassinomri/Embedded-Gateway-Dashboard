@@ -14,6 +14,7 @@ import Network from "@/pages/Network";
 import Firewall from "@/pages/Firewall";
 import Performance from "@/pages/Performance";
 import PacketAnalyzer from "./pages/PacketAnalyzer";
+import System from "./pages/System";
 
 
 const PlaceholderPage = ({ title }: { title: string }) => (
@@ -46,6 +47,8 @@ const App = () => (
               <Route path="/performance" element={<Performance />} />
               
               <Route path="/packet" element={<PacketAnalyzer/>} />
+
+              <Route path="/system" element={<System/>} />
               
               {/* System Routes */}
 

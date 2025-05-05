@@ -21,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { apiClient } from "@/lib/network-api";
 
 interface NavItemProps {
   title: string;
@@ -34,8 +35,7 @@ const navItems: NavItemProps[] = [
   { title: "Firewall", icon: Shield, path: "/firewall" },
   { title: "Performance", icon: BarChart, path: "/performance" },
   { title: "Packet Analysis", icon: Package, path: "/packet" },
-  { title: "System", icon: Server, path: "/system/information" },
-  { title: "Configuration", icon: Settings, path: "/configuration" },
+  { title: "System", icon: Server, path: "/system" },
 ];
 
 export function NavItem({ title, icon: Icon, path }: NavItemProps) {
@@ -62,8 +62,17 @@ export function MainSidebar() {
   const [rebootDialogOpen, setRebootDialogOpen] = useState(false);
 
   const handleReboot = () => {
-    console.log("Rebooting system...");
-    setRebootDialogOpen(false);
+      apiClient
+        .rebootSystem()
+        .then(() => {
+          alert("The system is rebooting...");
+        })
+        .catch((error) => {
+          alert(`Failed to reboot the system: ${error.message}`);
+        })
+        .finally(() => {
+          setRebootDialogOpen(false);
+        });
   };
 
   return (
@@ -119,7 +128,11 @@ export function MainSidebar() {
             <Button variant="outline" onClick={() => setRebootDialogOpen(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleReboot}>
+            <Button
+              variant="destructive"
+              onClick={handleReboot}
+              disabled={false} // You can add a loading state if needed
+            >
               Reboot
             </Button>
           </DialogFooter>

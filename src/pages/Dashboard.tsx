@@ -1,161 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle, Network, Shield, Activity, Search } from 'lucide-react';
+import React, { useEffect, useState } from "react";
+import { Line } from "react-chartjs-2";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
+import { AlertTriangle, CheckCircle, Wifi, Activity, Cpu, Download, Upload } from "lucide-react";
+import { apiClient } from "../lib/network-api";
 
-interface SystemOverview {
-  systemHealth: 'stable' | 'warning' | 'critical';
-  activeInterfaces: number;
-  firewallStatus: boolean;
-  criticalAlerts: number;
-  recentPerformance: { latency: number; throughput: number };
-  packetCaptures: number;
+interface DashboardStats {
+  memoryUsage: { used: number; total: number };
+  bandwidthUsage: { upload: number[]; download: number[] };
+  connectedDevices: number;
+  systemStatus: "stable" | "warning" | "critical";
+  throughput: { upload: number; download: number };
 }
 
 const Dashboard: React.FC = () => {
-  const [overview, setOverview] = useState<SystemOverview | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchOverview = async () => {
+    const fetchStats = async () => {
       try {
-        setIsLoading(true);
-        // Simulated API call for high-level system overview
-        const mockOverview: SystemOverview = {
-          systemHealth: 'stable',
-          activeInterfaces: 2,
-          firewallStatus: true,
-          criticalAlerts: 0,
-          recentPerformance: { latency: 12.3, throughput: 420 },
-          packetCaptures: 4,
-        };
-        setOverview(mockOverview);
+        setLoading(true);
+        const data = await apiClient.getDashboardStats();
+        setStats(data);
       } catch (error) {
-        console.error('Error fetching overview:', error);
+        console.error("Failed to fetch dashboard stats:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
-    fetchOverview();
-    const interval = setInterval(fetchOverview, 60000); // Update every minute
+    fetchStats();
+    const interval = setInterval(fetchStats, 60000); // Refresh every minute
     return () => clearInterval(interval);
   }, []);
 
-  const getHealthIcon = (health: string) => {
-    switch (health) {
-      case 'stable':
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "stable":
         return <CheckCircle className="text-green-500" />;
-      case 'warning':
+      case "warning":
         return <AlertTriangle className="text-yellow-500" />;
-      case 'critical':
+      case "critical":
         return <AlertTriangle className="text-red-500" />;
       default:
         return null;
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gray-100 p-6">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Network Monitoring Dashboard</h1>
+  const memoryUsagePercentage = stats
+    ? ((stats.memoryUsage.used / stats.memoryUsage.total) * 100).toFixed(1)
+    : "0";
 
-      {isLoading ? (
+  const bandwidthChartData = {
+    labels: Array.from({ length: stats?.bandwidthUsage.upload.length || 0 }, (_, i) => `${i + 1}s`),
+    datasets: [
+      {
+        label: "Upload (Mbps)",
+        data: stats?.bandwidthUsage.upload || [],
+        borderColor: "#4caf50",
+        backgroundColor: "rgba(76, 175, 80, 0.2)",
+        fill: true,
+      },
+      {
+        label: "Download (Mbps)",
+        data: stats?.bandwidthUsage.download || [],
+        borderColor: "#2196f3",
+        backgroundColor: "rgba(33, 150, 243, 0.2)",
+        fill: true,
+      },
+    ],
+  };
+
+  return (
+    <div className="container mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6 text-gray-800">Dashboard Overview</h1>
+
+      {loading ? (
         <div className="text-center text-gray-600">Loading...</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* System Health */}
-          <div className="bg-white p-4 rounded-lg shadow flex items-center">
-            <div className="mr-4">{getHealthIcon(overview?.systemHealth || 'stable')}</div>
-            <div>
-              <h2 className="text-xl font-semibold">System Health</h2>
-              <p className="text-lg capitalize">{overview?.systemHealth}</p>
-              <p className="text-sm text-gray-600">{overview?.criticalAlerts} critical alerts</p>
-              <Link to="/network-performance" className="text-blue-600 hover:underline">
-                Check Status
-              </Link>
-            </div>
-          </div>
+          {/* System Status */}
+          <Card>
+            <CardHeader>
+              <CardTitle>System Status</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center gap-4">
+              {getStatusIcon(stats?.systemStatus || "stable")}
+              <div>
+                <p className="text-lg capitalize">{stats?.systemStatus}</p>
+                <p className="text-sm text-gray-600">System is {stats?.systemStatus}</p>
+              </div>
+            </CardContent>
+          </Card>
 
-          {/* Network Interfaces */}
-          <div className="bg-white p-4 rounded-lg shadow flex items-center">
-            <Network className="text-blue-500 mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Interfaces</h2>
-              <p className="text-lg">{overview?.activeInterfaces} active</p>
-              <Link to="/network-config/interfaces" className="text-blue-600 hover:underline">
-                Manage Interfaces
-              </Link>
-            </div>
-          </div>
-
-          {/* Firewall Status */}
-          <div className="bg-white p-4 rounded-lg shadow flex items-center">
-            <Shield className="text-green-500 mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Firewall</h2>
-              <p className="text-lg">{overview?.firewallStatus ? 'Active' : 'Inactive'}</p>
-              <Link to="/firewall-rules" className="text-blue-600 hover:underline">
-                View Rules
-              </Link>
-            </div>
-          </div>
-
-          {/* Recent Performance */}
-          <div className="bg-white p-4 rounded-lg shadow flex items-center">
-            <Activity className="text-purple-500 mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Performance</h2>
-              <p className="text-sm text-gray-600">
-                Latency: {overview?.recentPerformance.latency.toFixed(1)} ms | Throughput:{' '}
-                {overview?.recentPerformance.throughput.toFixed(0)} Mbps
+          {/* Memory Usage */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Memory Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-lg">
+                {stats?.memoryUsage.used} MB / {stats?.memoryUsage.total} MB
               </p>
-              <Link to="/network-performance" className="text-blue-600 hover:underline">
-                Test Performance
-              </Link>
-            </div>
-          </div>
+              <p className="text-sm text-gray-600">{memoryUsagePercentage}% used</p>
+            </CardContent>
+          </Card>
 
-          {/* Packet Analyzer */}
-          <div className="bg-white p-4 rounded-lg shadow flex items-center">
-            <Search className="text-orange-500 mr-4" />
-            <div>
-              <h2 className="text-xl font-semibold">Packet Analyzer</h2>
-              <p className="text-lg">{overview?.packetCaptures} recent captures</p>
-              <Link to="/packet-analyzer" className="text-blue-600 hover:underline">
-                Analyze Packets
-              </Link>
-            </div>
-          </div>
+          {/* Connected Devices */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Connected Devices</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center gap-4">
+              <Wifi className="text-blue-500" />
+              <p className="text-lg">{stats?.connectedDevices} devices</p>
+            </CardContent>
+          </Card>
 
-          {/* Quick Actions */}
-          <div className="bg-white p-4 rounded-lg shadow col-span-1 md:col-span-2 lg:col-span-3">
-            <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-            <div className="flex flex-wrap gap-4">
-              <Link
-                to="/network-config/interfaces"
-                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-              >
-                Configure Interfaces
-              </Link>
-              <Link
-                to="/firewall-rules"
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                Manage Firewall
-              </Link>
-              <Link
-                to="/network-performance/test"
-                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
-              >
-                Run Performance Test
-              </Link>
-              <Link
-                to="/packet-analyzer"
-                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"
-              >
-                Start Packet Capture
-              </Link>
-            </div>
-          </div>
+          {/* Bandwidth Usage */}
+          <Card className="col-span-1 md:col-span-2">
+            <CardHeader>
+              <CardTitle>Bandwidth Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Line data={bandwidthChartData} />
+            </CardContent>
+          </Card>
+
+          {/* Throughput */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Throughput</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Download className="text-green-500" />
+                <p className="text-lg">{stats?.throughput.download} Mbps</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Upload className="text-blue-500" />
+                <p className="text-lg">{stats?.throughput.upload} Mbps</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
