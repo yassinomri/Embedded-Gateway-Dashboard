@@ -1,150 +1,179 @@
 import React, { useEffect, useState } from "react";
-import { Line } from "react-chartjs-2";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/Card";
-import { AlertTriangle, CheckCircle, Wifi, Activity, Cpu, Download, Upload } from "lucide-react";
-import { apiClient } from "../lib/network-api";
-
-interface DashboardStats {
-  memoryUsage: { used: number; total: number };
-  bandwidthUsage: { upload: number[]; download: number[] };
-  connectedDevices: number;
-  systemStatus: "stable" | "warning" | "critical";
-  throughput: { upload: number; download: number };
-}
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { apiClient } from "@/lib/dashboard-api";
+import { DashboardData } from "@/types/dashboard-data";
+import { Doughnut } from "react-chartjs-2";
 
 const Dashboard: React.FC = () => {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const data = await apiClient.getDashboardStats();
-        setStats(data);
-      } catch (error) {
-        console.error("Failed to fetch dashboard stats:", error);
-      } finally {
+    apiClient
+      .getDashboardData()
+      .then((data) => {
+        console.log("Dashboard Data:", data); // Debugging
+        setDashboardData(data);
         setLoading(false);
-      }
-    };
-
-    fetchStats();
-    const interval = setInterval(fetchStats, 60000); // Refresh every minute
-    return () => clearInterval(interval);
+      })
+      .catch((err) => {
+        console.error("API Error:", err); // Debugging
+        setError("Failed to fetch dashboard data.");
+        setLoading(false);
+      });
   }, []);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "stable":
-        return <CheckCircle className="text-green-500" />;
-      case "warning":
-        return <AlertTriangle className="text-yellow-500" />;
-      case "critical":
-        return <AlertTriangle className="text-red-500" />;
-      default:
-        return null;
-    }
-  };
+  if (loading) {
+    return <p>Loading dashboard data...</p>;
+  }
 
-  const memoryUsagePercentage = stats
-    ? ((stats.memoryUsage.used / stats.memoryUsage.total) * 100).toFixed(1)
-    : "0";
+  if (error) {
+    return <p className="text-red-500">{error}</p>;
+  }
 
-  const bandwidthChartData = {
-    labels: Array.from({ length: stats?.bandwidthUsage.upload.length || 0 }, (_, i) => `${i + 1}s`),
+  if (!dashboardData) {
+    return <p>No data available.</p>;
+  }
+
+  // Parse memory info
+  const memoryInfo = dashboardData?.memoryInfo
+    .split("\n")
+    .reduce((acc: Record<string, string>, line) => {
+      const [key, value] = line.split(":");
+      if (key && value) {
+        acc[key.trim()] = value.trim();
+      }
+      return acc;
+    }, {});
+
+  const totalMemory = parseInt(memoryInfo?.MemTotal || "0");
+  const freeMemory = parseInt(memoryInfo?.MemFree || "0");
+  const usedMemory = totalMemory - freeMemory;
+
+  // Parse CPU usage from top info
+  const cpuUsage = dashboardData?.topInfo
+    .split("\n")
+    .find((line) => line.includes("Cpu(s)"))
+    ?.match(/(\d+\.\d+)\s*id/);
+  const cpuUsagePercentage = cpuUsage ? (100 - parseFloat(cpuUsage[1])).toFixed(2) : "N/A";
+
+  const loadAverage = dashboardData?.topInfo
+    .split("\n")
+    .find((line) => line.includes("load average"))
+    ?.split(":")[1]
+    ?.trim();
+
+  // Chart data for memory usage
+  const memoryChartData = {
+    labels: ["Used", "Free"],
     datasets: [
       {
-        label: "Upload (Mbps)",
-        data: stats?.bandwidthUsage.upload || [],
-        borderColor: "#4caf50",
-        backgroundColor: "rgba(76, 175, 80, 0.2)",
-        fill: true,
+        data: [usedMemory, freeMemory],
+        backgroundColor: ["#FF6384", "#36A2EB"],
+        hoverBackgroundColor: ["#FF6384", "#36A2EB"],
       },
+    ],
+  };
+
+  // Chart data for CPU usage
+  const cpuChartData = {
+    labels: ["Used", "Idle"],
+    datasets: [
       {
-        label: "Download (Mbps)",
-        data: stats?.bandwidthUsage.download || [],
-        borderColor: "#2196f3",
-        backgroundColor: "rgba(33, 150, 243, 0.2)",
-        fill: true,
+        data: [cpuUsagePercentage, 100 - parseFloat(cpuUsagePercentage || "0")],
+        backgroundColor: ["#FFCE56", "#4BC0C0"],
+        hoverBackgroundColor: ["#FFCE56", "#4BC0C0"],
       },
     ],
   };
 
   return (
-    <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6 text-gray-800">Dashboard Overview</h1>
-
-      {loading ? (
-        <div className="text-center text-gray-600">Loading...</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* System Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle>System Status</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center gap-4">
-              {getStatusIcon(stats?.systemStatus || "stable")}
-              <div>
-                <p className="text-lg capitalize">{stats?.systemStatus}</p>
-                <p className="text-sm text-gray-600">System is {stats?.systemStatus}</p>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* System Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle>System Status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex justify-between items-center">
+              {/* Memory Usage Chart */}
+              <div className="w-1/2">
+                <Doughnut data={memoryChartData} />
+                <p className="text-center text-sm mt-2">Memory Usage</p>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Memory Usage */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Memory Usage</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-lg">
-                {stats?.memoryUsage.used} MB / {stats?.memoryUsage.total} MB
+              {/* CPU Usage Chart */}
+              <div className="w-1/2">
+                <Doughnut data={cpuChartData} />
+                <p className="text-center text-sm mt-2">CPU Usage</p>
+              </div>
+            </div>
+
+            {/* Additional System Info */}
+            <div className="mt-4 space-y-2">
+              <p>
+                <strong>Total Memory:</strong> {totalMemory} kB
               </p>
-              <p className="text-sm text-gray-600">{memoryUsagePercentage}% used</p>
-            </CardContent>
-          </Card>
+              <p>
+                <strong>Free Memory:</strong> {freeMemory} kB
+              </p>
+              <p>
+                <strong>Used Memory:</strong> {usedMemory} kB
+              </p>
+              <p>
+                <strong>CPU Usage:</strong> {cpuUsagePercentage}%
+              </p>
+              <p>
+                <strong>Load Average:</strong> {loadAverage || "N/A"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
-          {/* Connected Devices */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Connected Devices</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center gap-4">
-              <Wifi className="text-blue-500" />
-              <p className="text-lg">{stats?.connectedDevices} devices</p>
-            </CardContent>
-          </Card>
+        {/* Bandwidth Usage */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bandwidth Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-sm whitespace-pre-wrap">{dashboardData?.bandwidthInfo || "N/A"}</pre>
+          </CardContent>
+        </Card>
 
-          {/* Bandwidth Usage */}
-          <Card className="col-span-1 md:col-span-2">
-            <CardHeader>
-              <CardTitle>Bandwidth Usage</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Line data={bandwidthChartData} />
-            </CardContent>
-          </Card>
+        {/* Connected Devices */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Connected Devices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">
+              {dashboardData?.connectedDevicesInfo.split("\n").filter((line) => line.trim() !== "").length || 0}
+            </p>
+          </CardContent>
+        </Card>
 
-          {/* Throughput */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Throughput</CardTitle>
-            </CardHeader>
-            <CardContent className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Download className="text-green-500" />
-                <p className="text-lg">{stats?.throughput.download} Mbps</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Upload className="text-blue-500" />
-                <p className="text-lg">{stats?.throughput.upload} Mbps</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        {/* Firewall Rules */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Firewall Rules</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-sm whitespace-pre-wrap">{dashboardData?.firewallRulesInfo || "N/A"}</pre>
+          </CardContent>
+        </Card>
+
+        {/* Active Connections */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Connections</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-sm whitespace-pre-wrap">{dashboardData?.activeConnectionsInfo || "N/A"}</pre>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

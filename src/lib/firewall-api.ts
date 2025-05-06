@@ -1,42 +1,7 @@
 import axios from 'axios';
+import { ApiFirewallConfig, ApiRule, FirewallConfig, Rule, UpdateFirewallPayload } from '@/types/firewall';
 
-export interface Rule {
-  id: string;
-  name: string;
-  src: string;
-  dest: string;
-  proto: string;
-  target: string;
-  enabled: boolean;
-}
 
-export interface FirewallConfig {
-  enabled: boolean;
-  rules: Rule[];
-}
-
-// Interface for raw API response
-interface ApiRule {
-  id: string;
-  name: string;
-  src: string;
-  dest: string;
-  proto: string;
-  target: string;
-  enabled: number; // API returns 1 or 0
-}
-
-interface ApiFirewallConfig {
-  enabled: number; // API returns 1 or 0
-  rules: ApiRule[];
-}
-
-export interface UpdateFirewallPayload {
-  action: 'add' | 'update' | 'delete';
-  enabled?: boolean;
-  rules?: Rule[];
-  id?: string;
-}
 
 // Create a configured axios instance with timeout and base URL
 const firewallApi = axios.create({

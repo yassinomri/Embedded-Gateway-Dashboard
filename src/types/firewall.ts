@@ -1,34 +1,37 @@
+export interface Rule {
+  id: string;
+  name: string;
+  src: string;
+  dest: string;
+  proto: string;
+  target: string;
+  enabled: boolean;
+}
+
 export interface FirewallConfig {
   enabled: boolean;
-  rules: FirewallRule[];
+  rules: Rule[];
 }
 
-export interface FirewallRule {
+// Interface for raw API response
+export interface ApiRule {
   id: string;
   name: string;
-  source: string;
-  destination: string;
-  protocol: string;
-  action: string;
-  enabled: boolean;
+  src: string;
+  dest: string;
+  proto: string;
+  target: string;
+  enabled: number; // API returns 1 or 0
 }
 
-export type NewFirewallRule = Omit<FirewallRule, "id">;
+export interface ApiFirewallConfig {
+  enabled: number; // API returns 1 or 0
+  rules: ApiRule[];
+}
 
-export interface RawFirewallRule {
+export interface UpdateFirewallPayload {
+  action: 'add' | 'update' | 'delete';
+  enabled?: boolean;
+  rules?: Rule[];
   id?: string;
-  name: string;
-  src?: string; // e.g., "lan"
-  dest?: string; // e.g., "wan"
-  src_ip?: string;
-  dest_ip?: string;
-  proto?: string;
-  target?: string;
-  protocol?: string;
-  action?: string;
-  enabled: boolean;
-}
-
-export interface DeleteFirewallRule {
-  id: string;
 }

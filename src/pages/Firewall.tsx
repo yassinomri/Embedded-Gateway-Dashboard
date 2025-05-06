@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Shield, Trash2, Plus, AlertTriangle } from 'lucide-react';
-import { getFirewall, updateFirewall, FirewallConfig, Rule } from '../lib/firewall-api';
+import { FirewallConfig, Rule} from '@/types/firewall';
 import { useToast } from '../hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/Firewall.css';
 import { usePersistedState } from '../hooks/usePersistedState';
+import { getFirewall, updateFirewall } from '@/lib/firewall-api';
 
 // Debounce utility function
 const debounce = <F extends (...args: unknown[]) => Promise<unknown>>(
