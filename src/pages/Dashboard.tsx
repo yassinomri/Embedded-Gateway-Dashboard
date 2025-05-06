@@ -2,7 +2,28 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData } from "@/types/dashboard-data";
-import { Doughnut } from "react-chartjs-2";
+import { Doughnut, Line } from "react-chartjs-2"; // Import Line chart from react-chartjs-2
+import {
+  Chart as ChartJS,
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale, // Import CategoryScale for x-axis labels
+  LinearScale, // Import LinearScale for y-axis
+  PointElement,
+  LineElement,
+} from "chart.js";
+
+// Register Chart.js components
+ChartJS.register(
+  ArcElement,
+  Tooltip,
+  Legend,
+  CategoryScale, // Register CategoryScale
+  LinearScale, // Register LinearScale
+  PointElement,
+  LineElement
+);
 
 const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -13,12 +34,10 @@ const Dashboard: React.FC = () => {
     apiClient
       .getDashboardData()
       .then((data) => {
-        console.log("Dashboard Data:", data); // Debugging
         setDashboardData(data);
         setLoading(false);
       })
       .catch((err) => {
-        console.error("API Error:", err); // Debugging
         setError("Failed to fetch dashboard data.");
         setLoading(false);
       });
@@ -47,9 +66,9 @@ const Dashboard: React.FC = () => {
       return acc;
     }, {});
 
-  const totalMemory = parseInt(memoryInfo?.MemTotal || "0");
-  const freeMemory = parseInt(memoryInfo?.MemFree || "0");
-  const usedMemory = totalMemory - freeMemory;
+  const totalMemory = parseInt(memoryInfo?.MemTotal || "0") / 1024; // Convert to MB
+  const freeMemory = parseInt(memoryInfo?.MemFree || "0") / 1024; // Convert to MB
+  const usedMemory = totalMemory - freeMemory; // Already in MB
 
   // Parse CPU usage from top info
   const cpuUsage = dashboardData?.topInfo
@@ -88,6 +107,51 @@ const Dashboard: React.FC = () => {
     ],
   };
 
+  // Parse bandwidth info (assuming it's a raw string with upload/download rates over time)
+  const bandwidthLines = dashboardData?.bandwidthInfo.split("\n").filter((line) => line.trim() !== "");
+  const uploadData: number[] = [];
+  const downloadData: number[] = [];
+  const labels: string[] = [];
+
+  bandwidthLines?.forEach((line, index) => {
+    const match = line.match(/Upload: (\d+\.?\d*) Mbps, Download: (\d+\.?\d*) Mbps/);
+    if (match) {
+      uploadData.push(parseFloat(match[1]));
+      downloadData.push(parseFloat(match[2]));
+      labels.push(`T-${index}`); // Example labels like T-0, T-1, T-2
+    }
+  });
+
+  // Chart data for bandwidth usage
+  const bandwidthChartData = {
+    labels,
+    datasets: [
+      {
+        label: "Upload (Mbps)",
+        data: uploadData,
+        borderColor: "#36A2EB",
+        backgroundColor: "rgba(54, 162, 235, 0.2)",
+        fill: true,
+      },
+      {
+        label: "Download (Mbps)",
+        data: downloadData,
+        borderColor: "#FF6384",
+        backgroundColor: "rgba(255, 99, 132, 0.2)",
+        fill: true,
+      },
+    ],
+  };
+
+  // Parse connected devices info
+  const connectedDevices = dashboardData?.connectedDevicesInfo
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line) => {
+      const [timestamp, mac, ip, hostname] = line.split(" ");
+      return { timestamp, mac, ip, hostname };
+    });
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -114,13 +178,13 @@ const Dashboard: React.FC = () => {
             {/* Additional System Info */}
             <div className="mt-4 space-y-2">
               <p>
-                <strong>Total Memory:</strong> {totalMemory} kB
+                <strong>Total Memory:</strong> {totalMemory.toFixed(2)} MB
               </p>
               <p>
-                <strong>Free Memory:</strong> {freeMemory} kB
+                <strong>Free Memory:</strong> {freeMemory.toFixed(2)} MB
               </p>
               <p>
-                <strong>Used Memory:</strong> {usedMemory} kB
+                <strong>Used Memory:</strong> {usedMemory.toFixed(2)} MB
               </p>
               <p>
                 <strong>CPU Usage:</strong> {cpuUsagePercentage}%
@@ -138,7 +202,7 @@ const Dashboard: React.FC = () => {
             <CardTitle>Bandwidth Usage</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-sm whitespace-pre-wrap">{dashboardData?.bandwidthInfo || "N/A"}</pre>
+            <Line data={bandwidthChartData} />
           </CardContent>
         </Card>
 
@@ -148,9 +212,28 @@ const Dashboard: React.FC = () => {
             <CardTitle>Connected Devices</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {dashboardData?.connectedDevicesInfo.split("\n").filter((line) => line.trim() !== "").length || 0}
-            </p>
+            {connectedDevices && connectedDevices.length > 0 ? (
+              <table className="table-auto w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-2 text-left">IP Address</th>
+                    <th className="px-4 py-2 text-left">MAC Address</th>
+                    <th className="px-4 py-2 text-left">Hostname</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {connectedDevices.map((device, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="px-4 py-2">{device.ip}</td>
+                      <td className="px-4 py-2">{device.mac}</td>
+                      <td className="px-4 py-2">{device.hostname || "N/A"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No connected devices found.</p>
+            )}
           </CardContent>
         </Card>
 
