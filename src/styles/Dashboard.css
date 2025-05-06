@@ -21,3 +21,17 @@
     font-size: 16px;
     line-height: 1.5;
   }
+
+  /* Example CSS */
+.card-content ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+}
+
+.card-content ul li {
+  margin-bottom: 0.5rem;
+}
+
+.card-content button {
+  transition: background-color 0.2s ease;
+}

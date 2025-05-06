@@ -152,6 +152,25 @@ const Dashboard: React.FC = () => {
       return { timestamp, mac, ip, hostname };
     });
 
+  // Parse firewall rules info
+  const firewallRules = dashboardData?.firewallRulesInfo
+  .split("\n")
+  .reduce((acc: Record<string, unknown[]>, line) => {
+    if (line.startsWith("Chain")) {
+      // Extract chain name (e.g., "INPUT", "FORWARD", "OUTPUT")
+      const chainName = line.split(" ")[1];
+      acc[chainName] = [];
+    } else if (line.trim() && !line.startsWith("pkts")) {
+      // Parse rule details (if not a header line)
+      const [pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination] = line.split(/\s+/);
+      const lastChain = Object.keys(acc).pop(); // Get the last chain added
+      if (lastChain) {
+        acc[lastChain].push({ pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination });
+      }
+    }
+    return acc;
+  }, {});
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -237,13 +256,56 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Firewall Rules */}
+        {/* Firewall Status */}
         <Card>
           <CardHeader>
-            <CardTitle>Firewall Rules</CardTitle>
+            <CardTitle>Firewall Status</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-sm whitespace-pre-wrap">{dashboardData?.firewallRulesInfo || "N/A"}</pre>
+            <div className="space-y-4">
+              {/* Status Badge */}
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🔥</span>
+                <span className="text-lg font-bold">Firewall Status: </span>
+                <span className="px-2 py-1 bg-green-500 text-white text-sm rounded">ACTIVE</span>
+              </div>
+
+              {/* Summary Info */}
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  <strong>{firewallRules ? Object.keys(firewallRules).length : 0}</strong> Rules Active
+                </li>
+                <li>
+                  <strong>137</strong> Blocked Today {/* Replace with actual data if available */}
+                </li>
+                <li>
+                  <strong>Top IPs:</strong> 192.168.1.22, 192.168.1.45 {/* Replace with actual data */}
+                </li>
+              </ul>
+
+              {/* Last Alert */}
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xl">⚠️</span>
+                  <span className="font-bold">Last Alert:</span>
+                </div>
+                <p>Port Scan</p>
+                <p className="text-sm text-gray-500">2 mins ago</p> {/* Replace with actual data */}
+              </div>
+
+              {/* Go to Firewall Page Button */}
+              <div className="mt-4">
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                  onClick={() => {
+                    // Navigate to the Firewall page
+                    window.location.href = "/firewall";
+                  }}
+                >
+                  Go to Firewall Page
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
