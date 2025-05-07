@@ -57,7 +57,7 @@ const Dashboard: React.FC = () => {
 
   // Parse memory info
   const memoryInfo = dashboardData?.memoryInfo
-    .split("\n")
+    ?.toString().split("\n")
     .reduce((acc: Record<string, string>, line) => {
       const [key, value] = line.split(":");
       if (key && value) {
@@ -72,7 +72,7 @@ const Dashboard: React.FC = () => {
 
   // Parse CPU usage from top info
   const cpuUsage = dashboardData?.topInfo
-    .split("\n")
+    ?.toString().split("\n")
     .find((line) => line.includes("Cpu(s)"))
     ?.match(/(\d+\.\d+)\s*id/);
   const cpuUsagePercentage = cpuUsage ? (100 - parseFloat(cpuUsage[1])).toFixed(2) : "N/A";
@@ -154,7 +154,7 @@ const Dashboard: React.FC = () => {
 
   // Parse firewall rules info
   const firewallRules = dashboardData?.firewallRulesInfo
-  .split("\n")
+  ?.toString().split("\n")
   .reduce((acc: Record<string, unknown[]>, line) => {
     if (line.startsWith("Chain")) {
       // Extract chain name (e.g., "INPUT", "FORWARD", "OUTPUT")
@@ -267,31 +267,21 @@ const Dashboard: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <span className="text-xl">🔥</span>
                 <span className="text-lg font-bold">Firewall Status: </span>
-                <span className="px-2 py-1 bg-green-500 text-white text-sm rounded">ACTIVE</span>
+                <span
+                  className={`px-2 py-1 text-white text-sm rounded ${
+                    dashboardData?.firewallStatus.active ? "bg-green-500" : "bg-red-500"
+                  }`}
+                >
+                  {dashboardData?.firewallStatus.active ? "ACTIVE" : "INACTIVE"}
+                </span>
               </div>
 
               {/* Summary Info */}
               <ul className="list-disc pl-5 space-y-1">
                 <li>
-                  <strong>{firewallRules ? Object.keys(firewallRules).length : 0}</strong> Rules Active
-                </li>
-                <li>
-                  <strong>137</strong> Blocked Today {/* Replace with actual data if available */}
-                </li>
-                <li>
-                  <strong>Top IPs:</strong> 192.168.1.22, 192.168.1.45 {/* Replace with actual data */}
+                  <strong>{dashboardData?.firewallStatus.activeRulesCount || 0}</strong> Rules Active
                 </li>
               </ul>
-
-              {/* Last Alert */}
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xl">⚠️</span>
-                  <span className="font-bold">Last Alert:</span>
-                </div>
-                <p>Port Scan</p>
-                <p className="text-sm text-gray-500">2 mins ago</p> {/* Replace with actual data */}
-              </div>
 
               {/* Go to Firewall Page Button */}
               <div className="mt-4">
