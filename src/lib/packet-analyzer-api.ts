@@ -3,7 +3,7 @@
 import { PacketData } from "@/types/packet-analyzer";
 
 export async function fetchCapturedPackets(): Promise<PacketData[]> {
-  const res = await fetch("/cgi-bin/packet-analyzer.cgi");
+  const res = await fetch("http://192.168.1.1/cgi-bin/packet-analyzer.cgi");
 
   if (!res.ok) {
     throw new Error("Failed to fetch captured packets");

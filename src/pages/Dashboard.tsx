@@ -222,29 +222,6 @@ const Dashboard: React.FC = () => {
       });
   }, [dashboardData?.connectedDevicesInfo]);
 
-  // Parse firewall rules info
-  const firewallRules = useMemo(() => {
-    if (!dashboardData?.firewallRulesInfo) return {};
-    
-    return dashboardData.firewallRulesInfo
-      .toString()
-      .split("\n")
-      .reduce((acc: Record<string, unknown[]>, line) => {
-        if (line.startsWith("Chain")) {
-          const chainName = line.split(" ")[1];
-          acc[chainName] = [];
-        } else if (line.trim() && !line.startsWith("pkts")) {
-          // Parse rule details (if not a header line)
-          const [pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination] = line.split(/\s+/);
-          const lastChain = Object.keys(acc).pop(); // Get the last chain added
-          if (lastChain) {
-            acc[lastChain].push({ pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination });
-          }
-        }
-        return acc;
-      }, {});
-  }, [dashboardData?.firewallRulesInfo]);
-
   if (loading) return loadingContent;
   if (error) return errorContent;
   if (!dashboardData) return noDataContent;
@@ -303,9 +280,24 @@ const Dashboard: React.FC = () => {
             <CardTitle>Bandwidth Usage</CardTitle>
           </CardHeader>
           <CardContent>
-            <Suspense fallback={<p>Loading chart...</p>}>
-              {bandwidthChartData && <Line data={bandwidthChartData} />}
-            </Suspense>
+            <div className="space-y-4">
+              {/* Bandwidth Rates */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <p>
+                    <strong>Upload Rate:</strong> {dashboardData?.bandwidthInfo.txRate || "N/A"}
+                  </p>
+                  <p>
+                    <strong>Download Rate:</strong> {dashboardData?.bandwidthInfo.rxRate || "N/A"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bandwidth Chart */}
+              <Suspense fallback={<p>Loading chart...</p>}>
+                {bandwidthChartData && <Line data={bandwidthChartData} />}
+              </Suspense>
+            </div>
           </CardContent>
         </Card>
 
@@ -341,7 +333,50 @@ const Dashboard: React.FC = () => {
         </Card>
 
         {/* Firewall Status */}
-        <FirewallStatus firewallStatus={dashboardData?.firewallStatus} />
+        <Card>
+          <CardHeader>
+            <CardTitle>Firewall</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Status Badge */}
+              <div className="flex items-center space-x-2">
+                <span className="text-xl">🔥</span>
+                <span className="text-lg font-bold">Status: </span>
+                <span
+                  className={`px-2 py-1 text-white text-sm rounded ${
+                    dashboardData?.firewallStatus.status ? "bg-green-500" : "bg-red-500"
+                  }`}
+                >
+                  {dashboardData?.firewallStatus.status ? "Active" : "Inactive"}
+                </span>
+              </div>
+
+              {/* Summary Info */}
+              <ul className="list-disc pl-5 space-y-1">
+                <li>
+                  <strong>{dashboardData?.firewallStatus.rules.activeRules || 0}</strong> Rules Active
+                </li>
+                <li>
+                  <strong>{dashboardData?.firewallStatus.rules.totalRules || 0}</strong> Total Rules
+                </li>
+              </ul>
+
+              {/* Go to Firewall Page Button */}
+              <div className="mt-4">
+                <button
+                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                  onClick={() => {
+                    // Navigate to the Firewall page
+                    window.location.href = "/firewall";
+                  }}
+                >
+                  Go to Firewall Page
+                </button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Active Connections */}
         <Card>

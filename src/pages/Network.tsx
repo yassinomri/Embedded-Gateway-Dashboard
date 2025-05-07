@@ -166,13 +166,13 @@ export default function Network() {
     return isValidIP(data.address) && (!data.gateway || isValidIP(data.gateway));
   };
 
-  const validateWireless = () => {
+  function validateWireless() {
     return (
       isValidSSID(wirelessConfig.ssid) &&
-      (wirelessConfig.encryption === 'None' || isValidPassword(wirelessConfig.password)) &&
-      ['1', '6', '11', 'Auto'].includes(wirelessConfig.channel)
+      (wirelessConfig.encryption === "None" || isValidPassword(wirelessConfig.password)) &&
+      ["1", "6", "11", "Auto"].includes(wirelessConfig.channel)
     );
-  };
+  }
 
   const validateDhcpDns = () => {
     const startOctet = parseInt(rangeStartLastOctet, 10);
@@ -464,6 +464,7 @@ export default function Network() {
             <CardContent>
               <form className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* SSID */}
                   <div className="space-y-2">
                     <Label htmlFor="ssid">SSID</Label>
                     <Input
@@ -476,6 +477,8 @@ export default function Network() {
                       <p className="text-red-500 text-xs">SSID must be 1-32 characters</p>
                     )}
                   </div>
+
+                  {/* Password */}
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <Input
@@ -492,6 +495,8 @@ export default function Network() {
                         <p className="text-red-500 text-xs">Password must be 8-63 characters</p>
                       )}
                   </div>
+
+                  {/* Channel */}
                   <div className="space-y-2">
                     <Label htmlFor="channel">Channel</Label>
                     <Select
@@ -509,6 +514,8 @@ export default function Network() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Encryption */}
                   <div className="space-y-2">
                     <Label htmlFor="encryption">Encryption</Label>
                     <Select
@@ -526,6 +533,8 @@ export default function Network() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Enable Wireless */}
                 <div className="flex items-center space-x-2">
                   <Switch
                     id="wireless-enabled"
@@ -535,6 +544,8 @@ export default function Network() {
                   />
                   <Label htmlFor="wireless-enabled">Enable Wireless</Label>
                 </div>
+
+                {/* Save Button */}
                 <Button
                   type="button"
                   className="custom-button"

@@ -14,7 +14,7 @@ TARGET_IP_FILE="/tmp/performance_target_ip"
 
 # Default ping target and interface
 FALLBACK_TARGET="10.0.2.2" # Gateway, pingable
-INTERFACE="eth0" # Confirmed from ip addr
+INTERFACE="br-lan" # Confirmed from ip addr
 
 # Function to log messages
 log() {
