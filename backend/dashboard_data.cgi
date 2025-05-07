@@ -14,6 +14,14 @@ bandwidth_info=$(iftop -t -s 1 -n -N 2>/dev/null)
 # Retrieve active connections using netstat
 active_connections_info=$(netstat -tulnp)
 
+# Check if firewall is enabled
+firewall_status=$(uci get firewall.enabled 2>/dev/null || echo "1")
+if [ "$firewall_status" -eq 1 ]; then
+  firewall_status="enabled"
+else
+  firewall_status="disabled"
+fi
+
 # Count the number of active firewall rules (example: from logs or configuration)
 active_rules_count=$(grep -c '^config rule' /etc/config/firewall 2>/dev/null || echo 0)
 
@@ -32,8 +40,11 @@ cat <<EOF
   "connectedDevicesInfo": "$(echo "$connected_devices_info" | sed ':a;N;$!ba;s/\n/\\n/g')",
   "topInfo": "$(echo "$top_info" | sed ':a;N;$!ba;s/\n/\\n/g')",
   "firewallStatus": {
-    "active": true,
-    "activeRulesCount": $active_rules_count
+    "active": "$firewall_status",
+    "rules": {
+      "activeRules": "$(grep -c '^config rule' /etc/config/firewall 2>/dev/null || echo 0)",
+      "totalRules": "$(grep -c '^config ' /etc/config/firewall 2>/dev/null || echo 0)"
+    }
   }
 }
 EOF

@@ -1,15 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData } from "@/types/dashboard-data";
-import { Doughnut, Line } from "react-chartjs-2"; // Import Line chart from react-chartjs-2
+const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
+const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
 import {
   Chart as ChartJS,
   ArcElement,
   Tooltip,
   Legend,
-  CategoryScale, // Import CategoryScale for x-axis labels
-  LinearScale, // Import LinearScale for y-axis
+  CategoryScale,
+  LinearScale,
   PointElement,
   LineElement,
 } from "chart.js";
@@ -19,11 +20,42 @@ ChartJS.register(
   ArcElement,
   Tooltip,
   Legend,
-  CategoryScale, // Register CategoryScale
-  LinearScale, // Register LinearScale
+  CategoryScale,
+  LinearScale,
   PointElement,
   LineElement
 );
+
+const FirewallStatus = React.memo(({ firewallStatus }: { firewallStatus: DashboardData["firewallStatus"] }) => (
+  <Card>
+    <CardHeader>
+      <CardTitle>Firewall</CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-4">
+        <div className="flex items-center space-x-2">
+          <span className="text-xl">🔥</span>
+          <span className="text-lg font-bold">Status: </span>
+          <span
+            className={`px-2 py-1 text-white text-sm rounded ${
+              firewallStatus?.status ? "bg-green-500" : "bg-red-500"
+            }`}
+          >
+            {firewallStatus?.status ? "Active" : "Inactive"}
+          </span>
+        </div>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            <strong>{firewallStatus?.rules?.activeRules || 0}</strong> Active Rules
+          </li>
+          <li>
+            <strong>{firewallStatus?.rules?.totalRules || 0}</strong> Total Rules
+          </li>
+        </ul>
+      </div>
+    </CardContent>
+  </Card>
+));
 
 const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -31,145 +63,191 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiClient
-      .getDashboardData()
-      .then((data) => {
-        setDashboardData(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError("Failed to fetch dashboard data.");
-        setLoading(false);
-      });
+    const cachedData = localStorage.getItem("dashboardData");
+    if (cachedData) {
+      setDashboardData(JSON.parse(cachedData));
+      setLoading(false);
+    } else {
+      apiClient
+        .getDashboardData()
+        .then((data) => {
+          setDashboardData(data);
+          localStorage.setItem("dashboardData", JSON.stringify(data));
+        })
+        .catch(() => {
+          setError("Failed to fetch dashboard data.");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
   }, []);
 
-  if (loading) {
-    return <p>Loading dashboard data...</p>;
-  }
-
-  if (error) {
-    return <p className="text-red-500">{error}</p>;
-  }
-
-  if (!dashboardData) {
-    return <p>No data available.</p>;
-  }
+  const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
+  const errorContent = error ? <p className="text-red-500">{error}</p> : null;
+  const noDataContent = !dashboardData ? <p>No data available.</p> : null;
 
   // Parse memory info
-  const memoryInfo = dashboardData?.memoryInfo
-    ?.toString().split("\n")
-    .reduce((acc: Record<string, string>, line) => {
-      const [key, value] = line.split(":");
-      if (key && value) {
-        acc[key.trim()] = value.trim();
-      }
-      return acc;
-    }, {});
+  const memoryInfo = useMemo(() => {
+    if (!dashboardData?.memoryInfo) return {};
+    return dashboardData.memoryInfo
+      .toString()
+      .split("\n")
+      .reduce((acc: Record<string, string>, line) => {
+        const [key, value] = line.split(":");
+        if (key && value) {
+          acc[key.trim()] = value.trim();
+        }
+        return acc;
+      }, {});
+  }, [dashboardData?.memoryInfo]);
 
   const totalMemory = parseInt(memoryInfo?.MemTotal || "0") / 1024; // Convert to MB
   const freeMemory = parseInt(memoryInfo?.MemFree || "0") / 1024; // Convert to MB
   const usedMemory = totalMemory - freeMemory; // Already in MB
 
   // Parse CPU usage from top info
-  const cpuUsage = dashboardData?.topInfo
-    ?.toString().split("\n")
-    .find((line) => line.includes("Cpu(s)"))
-    ?.match(/(\d+\.\d+)\s*id/);
-  const cpuUsagePercentage = cpuUsage ? (100 - parseFloat(cpuUsage[1])).toFixed(2) : "N/A";
+  const cpuUsage = useMemo(() => {
+    if (!dashboardData?.topInfo) return "N/A";
+    const cpuLine = dashboardData.topInfo
+      .toString()
+      .split("\n")
+      .find((line) => line.includes("Cpu(s)"));
+    const match = cpuLine?.match(/(\d+\.\d+)\s*id/);
+    return match ? (100 - parseFloat(match[1])).toFixed(2) : "N/A";
+  }, [dashboardData?.topInfo]);
 
-  const loadAverage = dashboardData?.topInfo
-    .split("\n")
-    .find((line) => line.includes("load average"))
-    ?.split(":")[1]
-    ?.trim();
+  const loadAverage = useMemo(() => {
+    if (!dashboardData?.topInfo) return "N/A";
+    const loadLine = dashboardData.topInfo
+      .toString()
+      .split("\n")
+      .find((line) => line.includes("load average"));
+    return loadLine?.split(":")[1]?.trim() || "N/A";
+  }, [dashboardData?.topInfo]);
 
-  // Chart data for memory usage
-  const memoryChartData = {
-    labels: ["Used", "Free"],
-    datasets: [
-      {
-        data: [usedMemory, freeMemory],
-        backgroundColor: ["#FF6384", "#36A2EB"],
-        hoverBackgroundColor: ["#FF6384", "#36A2EB"],
-      },
-    ],
-  };
+  // Memory usage chart data
+  const memoryChartData = useMemo(() => {
+    if (!usedMemory || !freeMemory) return null;
+    return {
+      labels: ["Used", "Free"],
+      datasets: [
+        {
+          data: [usedMemory, freeMemory],
+          backgroundColor: ["#FF6384", "#36A2EB"],
+          hoverBackgroundColor: ["#FF6384", "#36A2EB"],
+        },
+      ],
+    };
+  }, [usedMemory, freeMemory]);
 
-  // Chart data for CPU usage
-  const cpuChartData = {
-    labels: ["Used", "Idle"],
-    datasets: [
-      {
-        data: [cpuUsagePercentage, 100 - parseFloat(cpuUsagePercentage || "0")],
-        backgroundColor: ["#FFCE56", "#4BC0C0"],
-        hoverBackgroundColor: ["#FFCE56", "#4BC0C0"],
-      },
-    ],
-  };
+  // CPU usage chart data
+  const cpuChartData = useMemo(() => {
+    if (!cpuUsage || cpuUsage === "N/A") return null;
+    return {
+      labels: ["Used", "Idle"],
+      datasets: [
+        {
+          data: [parseFloat(cpuUsage), 100 - parseFloat(cpuUsage)],
+          backgroundColor: ["#FFCE56", "#4BC0C0"],
+          hoverBackgroundColor: ["#FFCE56", "#4BC0C0"],
+        },
+      ],
+    };
+  }, [cpuUsage]);
 
-  // Parse bandwidth info (assuming it's a raw string with upload/download rates over time)
-  const bandwidthLines = dashboardData?.bandwidthInfo.split("\n").filter((line) => line.trim() !== "");
-  const uploadData: number[] = [];
-  const downloadData: number[] = [];
-  const labels: string[] = [];
+  // Parse bandwidth info
+  const bandwidthData = useMemo(() => {
+    if (!dashboardData?.bandwidthInfo) return { labels: [], uploadData: [], downloadData: [] };
+    
+    const bandwidthLines = dashboardData.bandwidthInfo
+      .toString()
+      .split("\n")
+      .filter((line) => line.trim() !== "");
+    
+    const uploadData: number[] = [];
+    const downloadData: number[] = [];
+    const labels: string[] = [];
 
-  bandwidthLines?.forEach((line, index) => {
-    const match = line.match(/Upload: (\d+\.?\d*) Mbps, Download: (\d+\.?\d*) Mbps/);
-    if (match) {
-      uploadData.push(parseFloat(match[1]));
-      downloadData.push(parseFloat(match[2]));
-      labels.push(`T-${index}`); // Example labels like T-0, T-1, T-2
-    }
-  });
-
-  // Chart data for bandwidth usage
-  const bandwidthChartData = {
-    labels,
-    datasets: [
-      {
-        label: "Upload (Mbps)",
-        data: uploadData,
-        borderColor: "#36A2EB",
-        backgroundColor: "rgba(54, 162, 235, 0.2)",
-        fill: true,
-      },
-      {
-        label: "Download (Mbps)",
-        data: downloadData,
-        borderColor: "#FF6384",
-        backgroundColor: "rgba(255, 99, 132, 0.2)",
-        fill: true,
-      },
-    ],
-  };
-
-  // Parse connected devices info
-  const connectedDevices = dashboardData?.connectedDevicesInfo
-    .split("\n")
-    .filter((line) => line.trim() !== "")
-    .map((line) => {
-      const [timestamp, mac, ip, hostname] = line.split(" ");
-      return { timestamp, mac, ip, hostname };
+    bandwidthLines.forEach((line, index) => {
+      const match = line.match(/Upload: (\d+\.?\d*) Mbps, Download: (\d+\.?\d*) Mbps/);
+      if (match) {
+        uploadData.push(parseFloat(match[1]));
+        downloadData.push(parseFloat(match[2]));
+        labels.push(`T-${index}`);
+      }
     });
 
+    return { labels, uploadData, downloadData };
+  }, [dashboardData?.bandwidthInfo]);
+
+  // Bandwidth chart data
+  const bandwidthChartData = useMemo(() => {
+    const { labels, uploadData, downloadData } = bandwidthData;
+    
+    if (labels.length === 0) return null;
+    
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Upload (Mbps)",
+          data: uploadData,
+          borderColor: "#FF6384",
+          backgroundColor: "rgba(255, 99, 132, 0.2)",
+          fill: false,
+        },
+        {
+          label: "Download (Mbps)",
+          data: downloadData,
+          borderColor: "#36A2EB",
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          fill: false,
+        },
+      ],
+    };
+  }, [bandwidthData]);
+
+  // Parse connected devices info
+  const connectedDevices = useMemo(() => {
+    if (!dashboardData?.connectedDevicesInfo) return [];
+    
+    return dashboardData.connectedDevicesInfo
+      .toString()
+      .split("\n")
+      .filter((line) => line.trim() !== "")
+      .map((line) => {
+        const [timestamp, mac, ip, hostname] = line.split(" ");
+        return { timestamp, mac, ip, hostname };
+      });
+  }, [dashboardData?.connectedDevicesInfo]);
+
   // Parse firewall rules info
-  const firewallRules = dashboardData?.firewallRulesInfo
-  ?.toString().split("\n")
-  .reduce((acc: Record<string, unknown[]>, line) => {
-    if (line.startsWith("Chain")) {
-      // Extract chain name (e.g., "INPUT", "FORWARD", "OUTPUT")
-      const chainName = line.split(" ")[1];
-      acc[chainName] = [];
-    } else if (line.trim() && !line.startsWith("pkts")) {
-      // Parse rule details (if not a header line)
-      const [pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination] = line.split(/\s+/);
-      const lastChain = Object.keys(acc).pop(); // Get the last chain added
-      if (lastChain) {
-        acc[lastChain].push({ pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination });
-      }
-    }
-    return acc;
-  }, {});
+  const firewallRules = useMemo(() => {
+    if (!dashboardData?.firewallRulesInfo) return {};
+    
+    return dashboardData.firewallRulesInfo
+      .toString()
+      .split("\n")
+      .reduce((acc: Record<string, unknown[]>, line) => {
+        if (line.startsWith("Chain")) {
+          const chainName = line.split(" ")[1];
+          acc[chainName] = [];
+        } else if (line.trim() && !line.startsWith("pkts")) {
+          // Parse rule details (if not a header line)
+          const [pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination] = line.split(/\s+/);
+          const lastChain = Object.keys(acc).pop(); // Get the last chain added
+          if (lastChain) {
+            acc[lastChain].push({ pkts, bytes, target, proto, opt, inInterface, outInterface, source, destination });
+          }
+        }
+        return acc;
+      }, {});
+  }, [dashboardData?.firewallRulesInfo]);
+
+  if (loading) return loadingContent;
+  if (error) return errorContent;
+  if (!dashboardData) return noDataContent;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -183,13 +261,17 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               {/* Memory Usage Chart */}
               <div className="w-1/2">
-                <Doughnut data={memoryChartData} />
+                <Suspense fallback={<p>Loading chart...</p>}>
+                  {memoryChartData && <Doughnut data={memoryChartData} />}
+                </Suspense>
                 <p className="text-center text-sm mt-2">Memory Usage</p>
               </div>
 
               {/* CPU Usage Chart */}
               <div className="w-1/2">
-                <Doughnut data={cpuChartData} />
+                <Suspense fallback={<p>Loading chart...</p>}>
+                  {cpuChartData && <Doughnut data={cpuChartData} />}
+                </Suspense>
                 <p className="text-center text-sm mt-2">CPU Usage</p>
               </div>
             </div>
@@ -206,10 +288,10 @@ const Dashboard: React.FC = () => {
                 <strong>Used Memory:</strong> {usedMemory.toFixed(2)} MB
               </p>
               <p>
-                <strong>CPU Usage:</strong> {cpuUsagePercentage}%
+                <strong>CPU Usage:</strong> {cpuUsage}%
               </p>
               <p>
-                <strong>Load Average:</strong> {loadAverage || "N/A"}
+                <strong>Load Average:</strong> {loadAverage}
               </p>
             </div>
           </CardContent>
@@ -221,7 +303,9 @@ const Dashboard: React.FC = () => {
             <CardTitle>Bandwidth Usage</CardTitle>
           </CardHeader>
           <CardContent>
-            <Line data={bandwidthChartData} />
+            <Suspense fallback={<p>Loading chart...</p>}>
+              {bandwidthChartData && <Line data={bandwidthChartData} />}
+            </Suspense>
           </CardContent>
         </Card>
 
@@ -257,47 +341,7 @@ const Dashboard: React.FC = () => {
         </Card>
 
         {/* Firewall Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Firewall Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Status Badge */}
-              <div className="flex items-center space-x-2">
-                <span className="text-xl">🔥</span>
-                <span className="text-lg font-bold">Firewall Status: </span>
-                <span
-                  className={`px-2 py-1 text-white text-sm rounded ${
-                    dashboardData?.firewallStatus.active ? "bg-green-500" : "bg-red-500"
-                  }`}
-                >
-                  {dashboardData?.firewallStatus.active ? "ACTIVE" : "INACTIVE"}
-                </span>
-              </div>
-
-              {/* Summary Info */}
-              <ul className="list-disc pl-5 space-y-1">
-                <li>
-                  <strong>{dashboardData?.firewallStatus.activeRulesCount || 0}</strong> Rules Active
-                </li>
-              </ul>
-
-              {/* Go to Firewall Page Button */}
-              <div className="mt-4">
-                <button
-                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                  onClick={() => {
-                    // Navigate to the Firewall page
-                    window.location.href = "/firewall";
-                  }}
-                >
-                  Go to Firewall Page
-                </button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <FirewallStatus firewallStatus={dashboardData?.firewallStatus} />
 
         {/* Active Connections */}
         <Card>
