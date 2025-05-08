@@ -76,27 +76,50 @@ const Dashboard: React.FC = () => {
   const totalMemory = parseInt(memoryInfo?.MemTotal || "0") / 1024; // Convert to MB
   const freeMemory = parseInt(memoryInfo?.MemFree || "0") / 1024; // Convert to MB
   const usedMemory = totalMemory - freeMemory; // Already in MB
+  const usedMemoryPercentage = ((usedMemory / totalMemory) * 100).toFixed(2);
+  const freeMemoryPercentage = ((freeMemory / totalMemory) * 100).toFixed(2);
 
+  // Parse CPU info
   const cpuUsageData = useMemo(() => {
-    if (!dashboardData?.topInfo) return { usage: "N/A", idlePercentage: 0, usedPercentage: 0 };
-    const cpuLine = dashboardData.topInfo
-      .toString()
-      .split("\n")
-      .find((line) => line.includes("Cpu(s)"));
+    if (!dashboardData?.topInfo) {
+      return { usage: "0", idlePercentage: 0, usedPercentage: 0 };
+    }
     
-    const match = cpuLine?.match(/(\d+\.\d+)\s*id/);
-    if (!match) return { usage: "N/A", idlePercentage: 0, usedPercentage: 0 };
-    
-    const idlePercentage = parseFloat(match[1]);
-    const usedPercentage = 100 - idlePercentage;
-    
-    return { 
-      usage: usedPercentage.toFixed(2),
-      idlePercentage,
-      usedPercentage
-    };
-  }, [dashboardData?.topInfo]);;
+    try {
+      const topInfoString = dashboardData.topInfo.toString();
+      
+      // Look for the CPU line in BusyBox top format (matches the actual data)
+      // Expected format: "CPU:   0% usr   0% sys   0% nic 100% idle   0% io   0% irq   0% sirq"
+      const cpuLine = topInfoString
+        .split("\n")
+        .find(line => line.startsWith("CPU:"));
+        
+      if (!cpuLine) {
+        return { usage: "0", idlePercentage: 100, usedPercentage: 0 };
+      }
+      
+      // Extract the idle percentage
+      const idleMatch = cpuLine.match(/(\d+)% idle/);
+      
+      if (!idleMatch) {
+        return { usage: "0", idlePercentage: 100, usedPercentage: 0 };
+      }
+      
+      const idlePercentage = parseInt(idleMatch[1], 10);
+      const usedPercentage = 100 - idlePercentage;
+      
+      return { 
+        usage: usedPercentage.toString(),
+        idlePercentage,
+        usedPercentage
+      };
+    } catch (error) {
+      console.error("Error parsing CPU data:", error);
+      return { usage: "0", idlePercentage: 100, usedPercentage: 0 };
+    }
+  }, [dashboardData?.topInfo]);
 
+  // Parse load average
   const loadAverage = useMemo(() => {
     if (!dashboardData?.topInfo) return "N/A";
     const loadLine = dashboardData.topInfo
@@ -108,24 +131,23 @@ const Dashboard: React.FC = () => {
 
   // Memory usage chart data
   const memoryChartData = useMemo(() => {
-    if (!usedMemory || !freeMemory) return null;
+    if (!usedMemoryPercentage || !freeMemoryPercentage) return null;
     return {
       labels: ["Used", "Free"],
       datasets: [
         {
-          data: [usedMemory, freeMemory],
+          data: [usedMemoryPercentage, freeMemoryPercentage],
           backgroundColor: ["#FF6384", "#36A2EB"],
           hoverBackgroundColor: ["#FF6384", "#36A2EB"],
         },
       ],
     };
-  }, [usedMemory, freeMemory]);
+  }, [usedMemoryPercentage, freeMemoryPercentage]);
 
-  // CPU usage chart dat
+  // CPU usage chart data
   const cpuChartData = useMemo(() => {
-    const { usedPercentage, idlePercentage } = cpuUsageData;
-    
-    if (usedPercentage === 0 && idlePercentage === 0) return null;
+    const usedPercentage = cpuUsageData.usedPercentage;
+    const idlePercentage = cpuUsageData.idlePercentage;
     
     return {
       labels: ["Used", "Idle"],
@@ -134,6 +156,7 @@ const Dashboard: React.FC = () => {
           data: [usedPercentage, idlePercentage],
           backgroundColor: ["#FF9F40", "#4BC0C0"],
           hoverBackgroundColor: ["#FF9F40", "#4BC0C0"],
+          borderColor: ["#E67E22", "#2E8B57"],
           borderWidth: 1,
         },
       ],
@@ -244,38 +267,78 @@ const Dashboard: React.FC = () => {
               {/* Memory Usage Chart */}
               <div className="w-1/2">
                 <Suspense fallback={<p>Loading chart...</p>}>
-                  {memoryChartData && <Doughnut data={memoryChartData} />}
+                  {memoryChartData && <Doughnut 
+                  data={memoryChartData}
+                  options={{
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      plugins: {
+                        legend: {
+                          display: true,
+                          position: 'bottom',
+                          labels: {
+                            boxWidth: 12,
+                            padding: 8
+                          }
+                        }
+                      }
+                    }}
+                  />}
                 </Suspense>
-                <p className="text-center text-sm mt-2">Memory Usage</p>
+                <p className="text-center text-sm mt-2">Memory Usage %</p>
               </div>
 
               {/* CPU Usage Chart */}
               <div className="w-1/2">
-                <Suspense fallback={<p>Loading chart...</p>}>
-                  {cpuChartData && <Doughnut data={cpuChartData} />}
+                <Suspense fallback={<div className="h-32 flex items-center justify-center">
+                  <p>Loading CPU chart...</p>
+                </div>}>
+                  <Doughnut 
+                    data={cpuChartData} 
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: true,
+                      plugins: {
+                        legend: {
+                          display: true,
+                          position: 'bottom',
+                          labels: {
+                            boxWidth: 12,
+                            padding: 8
+                          }
+                        }
+                      }
+                    }}
+                  />
                 </Suspense>
-                <p className="text-center text-sm mt-2">CPU Usage</p>
+                <p className="text-center text-sm mt-2">CPU Usage %</p>
               </div>
             </div>
 
             {/* Additional System Info */}
-            <div className="mt-4 space-y-2">
+            <div className="mt-8 space-y-2">
               <p>
-                <strong>Total Memory:</strong> {totalMemory.toFixed(2)} MB
+                <span className="text-base font-normal">Total Memory:</span>
+                <span className="text-lg ml-2 font-medium">{totalMemory.toFixed(2)} MB</span>
               </p>
               <p>
-                <strong>Free Memory:</strong> {freeMemory.toFixed(2)} MB
+                <span className="text-base font-normal">Free Memory:</span>
+                <span className="text-lg ml-2 font-medium">{freeMemory.toFixed(2)} MB</span>
               </p>
               <p>
-                <strong>Used Memory:</strong> {usedMemory.toFixed(2)} MB
+                <span className="text-base font-normal">Used Memory:</span>
+                <span className="text-lg ml-2 font-medium">{usedMemory.toFixed(2)} MB</span>
               </p>
               <p>
-                <strong>CPU Usage:</strong> {cpuUsageData.usage}%
+                <span className="text-base font-normal">CPU Usage:</span>
+                <span className="text-lg ml-2 font-medium">{cpuUsageData.usage}%</span>
               </p>
               <p>
-                <strong>Load Average:</strong> {loadAverage}
+                <span className="text-base font-normal">Load Average:</span>
+                <span className="text-lg ml-2 font-medium">{loadAverage}</span>
               </p>
             </div>
+
           </CardContent>
         </Card>
 
@@ -383,7 +446,7 @@ const Dashboard: React.FC = () => {
         </Card>
 
         {/* Active Connections */}
-        <Card className="col-span-2"> {/* Adjust grid span to give more space */}
+        <Card className="col-span-6"> {/* Adjust grid span to give more space */}
           <CardHeader>
             <CardTitle>Active Connections</CardTitle>
           </CardHeader>
