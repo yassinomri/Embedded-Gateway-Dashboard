@@ -10,6 +10,7 @@ import '@/styles/PacketAnalyzer.css';
 
 const formatTimestamp = (timestamp: string) => {
   const date = new Date(parseFloat(timestamp) * 1000);
+  date.setHours(date.getHours() + 1);
   return date.toISOString().replace('T', ' ').substring(0, 19);
 };
 
