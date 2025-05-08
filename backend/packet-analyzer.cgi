@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# CGI headers with CORS
+echo "Content-type: application/json"
+echo "Access-Control-Allow-Origin: *"
+echo "Access-Control-Allow-Methods: GET, POST"
+echo "Access-Control-Allow-Headers: Content-Type"
+echo ""
+
 # Required for CGI headers
 echo "Content-type: application/json"
 echo ""

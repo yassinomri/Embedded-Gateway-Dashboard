@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button"; // Assuming you have a Button component
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData } from "@/types/dashboard-data";
 const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
@@ -26,7 +27,7 @@ ChartJS.register(
   LineElement
 );
 
-const FirewallStatus = React.memo(({ firewallStatus }: { firewallStatus: DashboardData["firewallStatus"] }) => (
+/* const FirewallStatus = React.memo(({ firewallStatus }: { firewallStatus: DashboardData["firewallStatus"] }) => (
   <Card>
     <CardHeader>
       <CardTitle>Firewall</CardTitle>
@@ -55,7 +56,7 @@ const FirewallStatus = React.memo(({ firewallStatus }: { firewallStatus: Dashboa
       </div>
     </CardContent>
   </Card>
-));
+)); */ 
 
 const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -63,25 +64,25 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const cachedData = localStorage.getItem("dashboardData");
-    if (cachedData) {
-      setDashboardData(JSON.parse(cachedData));
-      setLoading(false);
-    } else {
-      apiClient
-        .getDashboardData()
-        .then((data) => {
-          setDashboardData(data);
-          localStorage.setItem("dashboardData", JSON.stringify(data));
-        })
-        .catch(() => {
-          setError("Failed to fetch dashboard data.");
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    }
+    const fetchData = async () => {
+      try {
+        const response = await apiClient.getDashboardData();
+        setDashboardData(response);
+        localStorage.setItem("dashboardData", JSON.stringify(response));
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError("Failed to fetch dashboard data.");
+      } finally {
+        setLoading(false); // Ensure loading is set to false
+      }
+    };
+
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    console.log("Dashboard Data:", dashboardData);
+  }, [dashboardData]);
 
   const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
   const errorContent = error ? <p className="text-red-500">{error}</p> : null;
@@ -345,34 +346,33 @@ const Dashboard: React.FC = () => {
                 <span className="text-lg font-bold">Status: </span>
                 <span
                   className={`px-2 py-1 text-white text-sm rounded ${
-                    dashboardData?.firewallStatus.status ? "bg-green-500" : "bg-red-500"
+                    dashboardData?.firewallStatus?.status ? "bg-green-500" : "bg-red-500"
                   }`}
                 >
-                  {dashboardData?.firewallStatus.status ? "Active" : "Inactive"}
+                  {dashboardData?.firewallStatus?.status ? "Active" : "Inactive"}
                 </span>
               </div>
 
               {/* Summary Info */}
               <ul className="list-disc pl-5 space-y-1">
                 <li>
-                  <strong>{dashboardData?.firewallStatus.rules.activeRules || 0}</strong> Rules Active
+                  <strong>{dashboardData?.firewallStatus?.rules?.activeRules || 0}</strong> Active Rules
                 </li>
                 <li>
-                  <strong>{dashboardData?.firewallStatus.rules.totalRules || 0}</strong> Total Rules
+                  <strong>{dashboardData?.firewallStatus?.rules?.totalRules || 0}</strong> Total Rules
                 </li>
               </ul>
 
               {/* Go to Firewall Page Button */}
               <div className="mt-4">
-                <button
-                  className="px-4 py-2 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                <Button
                   onClick={() => {
-                    // Navigate to the Firewall page
                     window.location.href = "/firewall";
                   }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 >
                   Go to Firewall Page
-                </button>
+                </Button>
               </div>
             </div>
           </CardContent>

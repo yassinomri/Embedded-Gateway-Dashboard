@@ -17,15 +17,15 @@ if [ "$REQUEST_METHOD" = "OPTIONS" ]; then
     exit 0
 fi
 
-# Handle GET request to fetch br-lan data
+# Handle GET request to fetch eth0 data
 if [ "$REQUEST_METHOD" = "GET" ]; then
     echo "$(date): GET request started" >> /tmp/network_cgi.log
 
-    # Get br-lan data, suppress stderr
-    IFCONFIG=$(ifconfig br-lan 2>/dev/null)
+    # Get eth0 data, suppress stderr
+    IFCONFIG=$(ifconfig eth0 2>/dev/null)
     if [ -z "$IFCONFIG" ]; then
-        echo "$(date): br-lan not found" >> /tmp/network_cgi.log
-        echo "{\"status\": \"error\", \"message\": \"Interface br-lan not found\"}"
+        echo "$(date): eth0 not found" >> /tmp/network_cgi.log
+        echo "{\"status\": \"error\", \"message\": \"Interface eth0 not found\"}"
         exit 0
     fi
 
@@ -46,13 +46,13 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     [ -z "$GATEWAY" ] && GATEWAY="0.0.0.0"
 
     # Output JSON
-    JSON="{\"interfaces\": [{\"id\": \"br-lan\", \"name\": \"br-lan\", \"status\": \"$STATUS\", \"macAddress\": \"$MAC\", \"ipAddress\": \"$IP\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}]}"
+    JSON="{\"interfaces\": [{\"id\": \"eth0\", \"name\": \"eth0\", \"status\": \"$STATUS\", \"macAddress\": \"$MAC\", \"ipAddress\": \"$IP\", \"netmask\": \"$NETMASK\", \"gateway\": \"$GATEWAY\"}]}"
     echo "$JSON"
     echo "$(date): GET response sent: $JSON" >> /tmp/network_cgi.log
     exit 0
 fi
 
-# Handle POST request to update br-lan
+# Handle POST request to update eth0
 if [ "$REQUEST_METHOD" = "POST" ]; then
     echo "$(date): POST request started" >> /tmp/network_cgi.log
     read -t 1 -r POST_DATA
@@ -63,7 +63,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     GATEWAY=$(echo "$POST_DATA" | sed -n 's/.*"gateway"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
 
     if [ -n "$INTERFACE" ] && [ -n "$IP" ]; then
-        if [ "$INTERFACE" = "br-lan" ]; then
+        if [ "$INTERFACE" = "eth0" ]; then
             uci set network.lan.ipaddr="$IP" 2>/dev/null
             if [ -n "$GATEWAY" ]; then
                 uci set network.lan.gateway="$GATEWAY" 2>/dev/null
