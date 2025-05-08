@@ -2,7 +2,7 @@ import { DashboardData } from "@/types/dashboard-data";
 
 export const apiClient = {
     getDashboardData: async (): Promise<DashboardData> => {
-        const url = "http://192.168.1.1/cgi-bin/dashboard_data.cgi";
+        const url = "http://localhost:8080/cgi-bin/dashboard_data.cgi";
         const response = await fetch(url, {
           method: "GET",
           headers: {

@@ -5,7 +5,7 @@ import { ApiFirewallConfig, ApiRule, FirewallConfig, Rule, UpdateFirewallPayload
 
 // Create a configured axios instance with timeout and base URL
 const firewallApi = axios.create({
-  baseURL: 'http://192.168.1.1',
+  baseURL: 'http://localhost:8080',
   timeout: 5000, // 5 second timeout
   headers: {
     'Content-Type': 'application/json'

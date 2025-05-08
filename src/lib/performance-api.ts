@@ -28,7 +28,7 @@ export interface UpdatePerformancePayload {
 
 export const getPerformance = async (): Promise<PerformanceData> => {
   try {
-    const response = await axios.get('http://192.168.1.1/cgi-bin/performance.cgi?action=get');
+    const response = await axios.get('http://localhost:8080/cgi-bin/performance.cgi?action=get');
     console.log('getPerformance Raw Response:', response.data);
     return response.data;
   } catch (error) {
@@ -39,7 +39,7 @@ export const getPerformance = async (): Promise<PerformanceData> => {
 
 export const updatePerformance = async (payload: UpdatePerformancePayload): Promise<void> => {
   try {
-    const response = await axios.post('http://192.168.1.1/cgi-bin/performance.cgi', payload);
+    const response = await axios.post('http://localhost:8080/cgi-bin/performance.cgi', payload);
     console.log('updatePerformance Response:', response.data);
   } catch (error) {
     console.error('updatePerformance Error:', error);

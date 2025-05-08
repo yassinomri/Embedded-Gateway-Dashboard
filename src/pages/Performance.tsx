@@ -61,7 +61,7 @@ const Performance = () => {
   useEffect(() => {
     const fetchTargetIp = async () => {
       const ip = await getTargetIp();
-      setCurrentTargetIp(ip || '192.168.1.1'); // Default to gateway
+      setCurrentTargetIp(ip || 'localhost:8080'); // Default to gateway
     };
     fetchTargetIp();
   }, []);
@@ -300,7 +300,7 @@ const Performance = () => {
               <h4 className="text-sm font-semibold text-blue-800 mb-2">Tips</h4>
               <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
                 <li>Use 8.8.8.8 (Google DNS) for external testing</li>
-                <li>Use your router's IP (e.g., 192.168.1.1) for local testing</li>
+                <li>Use your router's IP (e.g., localhost:8080) for local testing</li>
                 <li>Tests over 60 seconds provide better accuracy</li>
               </ul>
             </div>
