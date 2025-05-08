@@ -1,15 +1,22 @@
-// src/api/packet-analyzer.ts
-
 import { PacketData } from "@/types/packet-analyzer";
 
-export async function fetchCapturedPackets(): Promise<PacketData[]> {
-  const res = await fetch("http://localhost:8080/cgi-bin/packet-analyzer.cgi");
+export const fetchCapturedPackets = async (): Promise<PacketData[]> => {
+  try {
+    const response = await fetch("http://localhost:8080/cgi-bin/packet-analyzer.cgi?option=GET");
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-  if (!res.ok) {
-    throw new Error("Failed to fetch captured packets");
+    const text = await response.text();
+    const jsonStartIndex = text.indexOf("["); // Find the start of the JSON array
+    if (jsonStartIndex === -1) {
+      throw new Error("Invalid response format: JSON data not found");
+    }
+
+    const jsonString = text.substring(jsonStartIndex); // Extract the JSON part
+    return JSON.parse(jsonString); // Parse the JSON
+  } catch (error) {
+    console.error("Error fetching captured packets:", error);
+    throw error;
   }
-
-  const data = await res.json(); // ✅ Correct parsing!
-
-  return data as PacketData[]; // ✅ Tell TypeScript it is an array of PacketData
-}
+};

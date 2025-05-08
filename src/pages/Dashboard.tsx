@@ -27,37 +27,6 @@ ChartJS.register(
   LineElement
 );
 
-/* const FirewallStatus = React.memo(({ firewallStatus }: { firewallStatus: DashboardData["firewallStatus"] }) => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Firewall</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <span className="text-xl">🔥</span>
-          <span className="text-lg font-bold">Status: </span>
-          <span
-            className={`px-2 py-1 text-white text-sm rounded ${
-              firewallStatus?.status ? "bg-green-500" : "bg-red-500"
-            }`}
-          >
-            {firewallStatus?.status ? "Active" : "Inactive"}
-          </span>
-        </div>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>
-            <strong>{firewallStatus?.rules?.activeRules || 0}</strong> Active Rules
-          </li>
-          <li>
-            <strong>{firewallStatus?.rules?.totalRules || 0}</strong> Total Rules
-          </li>
-        </ul>
-      </div>
-    </CardContent>
-  </Card>
-)); */ 
-
 const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);

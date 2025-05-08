@@ -82,7 +82,7 @@ const PacketAnalyzer = () => {
               <TableHead>Time</TableHead>
               <TableHead>Source</TableHead>
               <TableHead>Destination</TableHead>
-              <TableHead>Info</TableHead>
+              <TableHead>Protocol</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -133,7 +133,7 @@ const PacketAnalyzer = () => {
                       </HoverCardContent>
                     </HoverCard>
                   </TableCell>
-                  <TableCell>{packet.info}</TableCell>
+                  <TableCell>{packet.protocol}</TableCell>
                 </TableRow>
               ))
             ) : (
