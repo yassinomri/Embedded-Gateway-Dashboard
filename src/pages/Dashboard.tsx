@@ -15,6 +15,7 @@ import {
   PointElement,
   LineElement,
 } from "chart.js";
+import { cpuUsage } from "process";
 
 // Register Chart.js components
 ChartJS.register(
@@ -76,16 +77,25 @@ const Dashboard: React.FC = () => {
   const freeMemory = parseInt(memoryInfo?.MemFree || "0") / 1024; // Convert to MB
   const usedMemory = totalMemory - freeMemory; // Already in MB
 
-  // Parse CPU usage from top info
-  const cpuUsage = useMemo(() => {
-    if (!dashboardData?.topInfo) return "N/A";
+  const cpuUsageData = useMemo(() => {
+    if (!dashboardData?.topInfo) return { usage: "N/A", idlePercentage: 0, usedPercentage: 0 };
     const cpuLine = dashboardData.topInfo
       .toString()
       .split("\n")
       .find((line) => line.includes("Cpu(s)"));
+    
     const match = cpuLine?.match(/(\d+\.\d+)\s*id/);
-    return match ? (100 - parseFloat(match[1])).toFixed(2) : "N/A";
-  }, [dashboardData?.topInfo]);
+    if (!match) return { usage: "N/A", idlePercentage: 0, usedPercentage: 0 };
+    
+    const idlePercentage = parseFloat(match[1]);
+    const usedPercentage = 100 - idlePercentage;
+    
+    return { 
+      usage: usedPercentage.toFixed(2),
+      idlePercentage,
+      usedPercentage
+    };
+  }, [dashboardData?.topInfo]);;
 
   const loadAverage = useMemo(() => {
     if (!dashboardData?.topInfo) return "N/A";
@@ -111,20 +121,24 @@ const Dashboard: React.FC = () => {
     };
   }, [usedMemory, freeMemory]);
 
-  // CPU usage chart data
+  // CPU usage chart dat
   const cpuChartData = useMemo(() => {
-    if (!cpuUsage || cpuUsage === "N/A") return null;
+    const { usedPercentage, idlePercentage } = cpuUsageData;
+    
+    if (usedPercentage === 0 && idlePercentage === 0) return null;
+    
     return {
       labels: ["Used", "Idle"],
       datasets: [
         {
-          data: [parseFloat(cpuUsage), 100 - parseFloat(cpuUsage)],
-          backgroundColor: ["#FFCE56", "#4BC0C0"],
-          hoverBackgroundColor: ["#FFCE56", "#4BC0C0"],
+          data: [usedPercentage, idlePercentage],
+          backgroundColor: ["#FF9F40", "#4BC0C0"],
+          hoverBackgroundColor: ["#FF9F40", "#4BC0C0"],
+          borderWidth: 1,
         },
       ],
     };
-  }, [cpuUsage]);
+  }, [cpuUsageData]);
 
   // Parse bandwidth info
   const bandwidthData = useMemo(() => {
@@ -192,13 +206,34 @@ const Dashboard: React.FC = () => {
       });
   }, [dashboardData?.connectedDevicesInfo]);
 
+  // Parse active connections info
+  const activeConnections = useMemo(() => {
+    if (!dashboardData?.activeConnectionsInfo) return [];
+
+    return dashboardData.activeConnectionsInfo
+      .toString()
+      .split("\n")
+      .filter((line) => line.trim() !== "" && !line.startsWith("Proto")) // Skip headers or empty lines
+      .map((line) => {
+        const parts = line.split(/\s+/); // Split by whitespace
+        return {
+          protocol: parts[0],
+          recvQ: parts[1],
+          sendQ: parts[2],
+          localAddress: parts[3],
+          foreignAddress: parts[4],
+          state: parts[5] || "N/A", // State might not always be present
+        };
+      });
+  }, [dashboardData?.activeConnectionsInfo]);
+
   if (loading) return loadingContent;
   if (error) return errorContent;
   if (!dashboardData) return noDataContent;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {/* System Status */}
         <Card>
           <CardHeader>
@@ -235,7 +270,7 @@ const Dashboard: React.FC = () => {
                 <strong>Used Memory:</strong> {usedMemory.toFixed(2)} MB
               </p>
               <p>
-                <strong>CPU Usage:</strong> {cpuUsage}%
+                <strong>CPU Usage:</strong> {cpuUsageData.usage}%
               </p>
               <p>
                 <strong>Load Average:</strong> {loadAverage}
@@ -348,12 +383,44 @@ const Dashboard: React.FC = () => {
         </Card>
 
         {/* Active Connections */}
-        <Card>
+        <Card className="col-span-2"> {/* Adjust grid span to give more space */}
           <CardHeader>
             <CardTitle>Active Connections</CardTitle>
           </CardHeader>
           <CardContent>
-            <pre className="text-sm whitespace-pre-wrap">{dashboardData?.activeConnectionsInfo || "N/A"}</pre>
+            {activeConnections.length > 0 ? (
+              <div className="overflow-y-auto max-h-96"> {/* Make the table scrollable */}
+                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2 text-left border border-gray-300">Protocol</th>
+                      <th className="px-4 py-2 text-left border border-gray-300">Recv-Q</th>
+                      <th className="px-4 py-2 text-left border border-gray-300">Send-Q</th>
+                      <th className="px-4 py-2 text-left border border-gray-300">Local Address</th>
+                      <th className="px-4 py-2 text-left border border-gray-300">Foreign Address</th>
+                      <th className="px-4 py-2 text-left border border-gray-300">State</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activeConnections.map((connection, index) => (
+                      <tr
+                        key={index}
+                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} // Alternating row colors
+                      >
+                        <td className="px-4 py-2 border border-gray-300">{connection.protocol}</td>
+                        <td className="px-4 py-2 border border-gray-300">{connection.recvQ}</td>
+                        <td className="px-4 py-2 border border-gray-300">{connection.sendQ}</td>
+                        <td className="px-4 py-2 border border-gray-300">{connection.localAddress}</td>
+                        <td className="px-4 py-2 border border-gray-300">{connection.foreignAddress}</td>
+                        <td className="px-4 py-2 border border-gray-300">{connection.state}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>No active connections found.</p>
+            )}
           </CardContent>
         </Card>
       </div>

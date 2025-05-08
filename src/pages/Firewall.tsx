@@ -6,6 +6,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/Firewall.css';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { getFirewall, updateFirewall } from '@/lib/firewall-api';
+import { DashboardData } from '@/types/dashboard-data';
+import Dashboard from './Dashboard';
 
 // Debounce utility function
 const debounce = <F extends (...args: unknown[]) => Promise<unknown>>(
@@ -300,6 +302,10 @@ const handleToggleFirewall = async () => {
           <span className="toggle-slider"></span>
         </label>
       </div>
+
+        <label className="total-rules-label">
+          Total Rules: <span className="total-rules-count">{}</span>
+        </label>
         <button
           onClick={() => setIsModalOpen(true)}
           className="primary-button add-rule-button"
