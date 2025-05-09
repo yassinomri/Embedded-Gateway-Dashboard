@@ -6,8 +6,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import '../styles/Firewall.css';
 import { usePersistedState } from '../hooks/usePersistedState';
 import { getFirewall, updateFirewall } from '@/lib/firewall-api';
-import { DashboardData } from '@/types/dashboard-data';
-import Dashboard from './Dashboard';
 
 // Debounce utility function
 const debounce = <F extends (...args: unknown[]) => Promise<unknown>>(
@@ -37,6 +35,7 @@ const debounce = <F extends (...args: unknown[]) => Promise<unknown>>(
     }) as ReturnType<F>;
   };
 };
+
 
 const Firewall: React.FC = () => {
   const [config, setConfig] = usePersistedState<FirewallConfig>('firewallConfig', { enabled: true, rules: [] });

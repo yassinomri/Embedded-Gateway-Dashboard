@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 3000, // Changed from 8080 to avoid conflict with uhttpd
     proxy: {
       "/cgi-bin": {
-        target: "http://localhost:8080",
+        target: "http://192.168.1.1",
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path, // Preserve /cgi-bin/network.cgi

@@ -6,7 +6,7 @@ export interface DashboardData {
   };
   activeConnectionsInfo: string; // Raw output of netstat -tulnp
   connectedDevicesInfo: string; // Raw output of /tmp/dhcp.leases
-  topInfo: string; // Raw output of top -bn1
+  loadaverageInfo: string; // Raw output of /proc/loadavg
   firewallStatus: {
     status: boolean; // true if firewall is running, false otherwise
     rules: {

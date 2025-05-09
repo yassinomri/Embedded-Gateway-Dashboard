@@ -3,6 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; // Assuming you have a Button component
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData } from "@/types/dashboard-data";
+
+
+// Function to format memory values
+const formatMemory = (value: number): string => {
+  if (value < 1024) {
+    return `${value} KB`; // Less than 1 MB
+  } else if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(2)} MB`; // Less than 1 GB
+  } else {
+    return `${(value / (1024 * 1024)).toFixed(2)} GB`; // 1 GB or more
+  }
+};
+
+
 const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
 const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
 import {
@@ -54,6 +68,10 @@ const Dashboard: React.FC = () => {
     console.log("Dashboard Data:", dashboardData);
   }, [dashboardData]);
 
+  useEffect(() => {
+    console.log("Connected Devices Info:", dashboardData?.connectedDevicesInfo);
+  }, [dashboardData?.connectedDevicesInfo]);
+
   const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
   const errorContent = error ? <p className="text-red-500">{error}</p> : null;
   const noDataContent = !dashboardData ? <p>No data available.</p> : null;
@@ -73,20 +91,20 @@ const Dashboard: React.FC = () => {
       }, {});
   }, [dashboardData?.memoryInfo]);
 
-  const totalMemory = parseInt(memoryInfo?.MemTotal || "0") / 1024; // Convert to MB
-  const freeMemory = parseInt(memoryInfo?.MemFree || "0") / 1024; // Convert to MB
-  const usedMemory = totalMemory - freeMemory; // Already in MB
+  const totalMemory = parseInt(memoryInfo?.MemTotal || "0");
+  const freeMemory = parseInt(memoryInfo?.MemFree);
+  const usedMemory = totalMemory - freeMemory; 
   const usedMemoryPercentage = ((usedMemory / totalMemory) * 100).toFixed(2);
   const freeMemoryPercentage = ((freeMemory / totalMemory) * 100).toFixed(2);
 
   // Parse CPU info
   const cpuUsageData = useMemo(() => {
-    if (!dashboardData?.topInfo) {
+    if (!dashboardData?.loadaverageInfo) {
       return { usage: "0", idlePercentage: 0, usedPercentage: 0 };
     }
     
     try {
-      const topInfoString = dashboardData.topInfo.toString();
+      const topInfoString = dashboardData.loadaverageInfo.toString();
       
       // Look for the CPU line in BusyBox top format (matches the actual data)
       // Expected format: "CPU:   0% usr   0% sys   0% nic 100% idle   0% io   0% irq   0% sirq"
@@ -117,17 +135,17 @@ const Dashboard: React.FC = () => {
       console.error("Error parsing CPU data:", error);
       return { usage: "0", idlePercentage: 100, usedPercentage: 0 };
     }
-  }, [dashboardData?.topInfo]);
+  }, [dashboardData?.loadaverageInfo]);
 
   // Parse load average
   const loadAverage = useMemo(() => {
-    if (!dashboardData?.topInfo) return "N/A";
-    const loadLine = dashboardData.topInfo
+    if (!dashboardData?.loadaverageInfo) return "N/A";
+    const loadLine = dashboardData.loadaverageInfo
       .toString()
       .split("\n")
       .find((line) => line.includes("load average"));
     return loadLine?.split(":")[1]?.trim() || "N/A";
-  }, [dashboardData?.topInfo]);
+  }, [dashboardData?.loadaverageInfo]);
 
   // Memory usage chart data
   const memoryChartData = useMemo(() => {
@@ -218,16 +236,24 @@ const Dashboard: React.FC = () => {
   // Parse connected devices info
   const connectedDevices = useMemo(() => {
     if (!dashboardData?.connectedDevicesInfo) return [];
-    
+  
     return dashboardData.connectedDevicesInfo
       .toString()
-      .split("\n")
-      .filter((line) => line.trim() !== "")
+      .split(/\r?\n/) // Handle both \n and \r\n line separators
+      .filter((line) => line.trim() !== "") // Remove empty lines
       .map((line) => {
-        const [timestamp, mac, ip, hostname] = line.split(" ");
+        const parts = line.split(/\s+/); // Split by whitespace
+        const timestamp = parts[0] || "N/A";
+        const mac = parts[1] || "N/A";
+        const ip = parts[2] || "N/A";
+        const hostname = parts.slice(3).join(" ") || "N/A"; // Handle hostnames with spaces
         return { timestamp, mac, ip, hostname };
       });
   }, [dashboardData?.connectedDevicesInfo]);
+
+  useEffect(() => {
+    console.log("Parsed Connected Devices:", connectedDevices);
+  }, [connectedDevices]);
 
   // Parse active connections info
   const activeConnections = useMemo(() => {
@@ -266,10 +292,12 @@ const Dashboard: React.FC = () => {
             <div className="flex justify-between items-center">
               {/* Memory Usage Chart */}
               <div className="w-1/2">
-                <Suspense fallback={<p>Loading chart...</p>}>
-                  {memoryChartData && <Doughnut 
-                  data={memoryChartData}
-                  options={{
+                <Suspense fallback={<div className="h-32 flex items-center justify-center">
+                  <p>Loading Memory chart...</p>
+                </div>}>
+                  <Doughnut 
+                    data={memoryChartData} 
+                    options={{
                       responsive: true,
                       maintainAspectRatio: true,
                       plugins: {
@@ -283,7 +311,7 @@ const Dashboard: React.FC = () => {
                         }
                       }
                     }}
-                  />}
+                  />
                 </Suspense>
                 <p className="text-center text-sm mt-2">Memory Usage %</p>
               </div>
@@ -319,15 +347,15 @@ const Dashboard: React.FC = () => {
             <div className="mt-8 space-y-2">
               <p>
                 <span className="text-base font-normal">Total Memory:</span>
-                <span className="text-lg ml-2 font-medium">{totalMemory.toFixed(2)} MB</span>
+                <span className="text-lg ml-2 font-medium">{formatMemory(totalMemory)}</span>
               </p>
               <p>
                 <span className="text-base font-normal">Free Memory:</span>
-                <span className="text-lg ml-2 font-medium">{freeMemory.toFixed(2)} MB</span>
+                <span className="text-lg ml-2 font-medium">{formatMemory(freeMemory)}</span>
               </p>
               <p>
                 <span className="text-base font-normal">Used Memory:</span>
-                <span className="text-lg ml-2 font-medium">{usedMemory.toFixed(2)} MB</span>
+                <span className="text-lg ml-2 font-medium">{formatMemory(usedMemory)}</span>
               </p>
               <p>
                 <span className="text-base font-normal">CPU Usage:</span>
@@ -369,38 +397,7 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Connected Devices */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Connected Devices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {connectedDevices && connectedDevices.length > 0 ? (
-              <table className="table-auto w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-2 text-left">IP Address</th>
-                    <th className="px-4 py-2 text-left">MAC Address</th>
-                    <th className="px-4 py-2 text-left">Hostname</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {connectedDevices.map((device, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="px-4 py-2">{device.ip}</td>
-                      <td className="px-4 py-2">{device.mac}</td>
-                      <td className="px-4 py-2">{device.hostname || "N/A"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p>No connected devices found.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Firewall Status */}
+                {/* Firewall Status */}
         <Card>
           <CardHeader>
             <CardTitle>Firewall</CardTitle>
@@ -445,8 +442,41 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Connected Devices */}
+        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+          <CardHeader>
+            <CardTitle>Connected Devices</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {connectedDevices && connectedDevices.length > 0 ? (
+              <table className="table-auto w-full text-sm">
+                <thead>
+                  <tr>
+                    <th className="px-4 py-2 text-left">IP Address</th>
+                    <th className="px-4 py-2 text-left">MAC Address</th>
+                    <th className="px-4 py-2 text-left">Hostname</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {connectedDevices.map((device, index) => (
+                    <tr key={index} className="border-t">
+                      <td className="px-4 py-2">{device.ip}</td>
+                      <td className="px-4 py-2">{device.mac}</td>
+                      <td className="px-4 py-2">{device.hostname || "N/A"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p>No connected devices found.</p>
+            )}
+          </CardContent>
+        </Card>
+
+
+
         {/* Active Connections */}
-        <Card className="col-span-6"> {/* Adjust grid span to give more space */}
+        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
           <CardHeader>
             <CardTitle>Active Connections</CardTitle>
           </CardHeader>

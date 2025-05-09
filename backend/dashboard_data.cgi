@@ -67,8 +67,8 @@ done <<EOF
 $connected_devices_info
 EOF
 
-# Retrieve system status using top
-top_info=$(top -bn1 2>/dev/null || echo "System status unavailable")
+# Retrieve loadaverage 
+loadaverage_info=$(cat /proc/loadavg 2>/dev/null || echo "N/A")
 
 # Helper function to escape JSON strings
 json_escape() {
@@ -85,7 +85,7 @@ cat <<EOF
   },
   "activeConnectionsInfo": "$(json_escape "$active_connections_info")",
   "connectedDevicesInfo": "$(json_escape "$formatted_devices")",
-  "topInfo": "$(json_escape "$top_info")",
+  "loadaverageInfo": "$(json_escape "$loadaverage_info")",
   "firewallStatus": {
     "status": $firewall_enabled,
     "rules": {

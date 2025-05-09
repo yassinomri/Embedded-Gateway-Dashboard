@@ -3,6 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiClient } from "../lib/system-api";
 import { SystemInfo } from "../types/system-info";
 
+const formatMemory = (value: number): string => {
+  if (value < 1024) {
+    return `${value} KB`; // Less than 1 MB
+  } else if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(2)} MB`; // Less than 1 GB
+  } else {
+    return `${(value / (1024 * 1024)).toFixed(2)} GB`; // 1 GB or more
+  }
+};
 
 const System: React.FC = () => {
     const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
@@ -57,10 +66,10 @@ const System: React.FC = () => {
                 <strong>CPU Cores:</strong> {systemInfo?.cpuCores}
               </div>
               <div>
-                <strong>Total Memory:</strong> {systemInfo?.memoryTotal}
+                <strong>Total Memory:</strong> {systemInfo?.memoryTotal ? formatMemory(systemInfo.memoryTotal) : "N/A"}
               </div>
               <div>
-                <strong>Free Memory:</strong> {systemInfo?.memoryFree}
+                <strong>Free Memory:</strong> {systemInfo?.memoryFree ? formatMemory(systemInfo.memoryFree) : "N/A"}
               </div>
               <div>
                 <strong>Load Average:</strong> {systemInfo?.loadAverage}

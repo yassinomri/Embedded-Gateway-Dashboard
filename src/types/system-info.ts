@@ -5,7 +5,7 @@ export interface SystemInfo {
     hostname: string;
     cpuModel: string;
     cpuCores: string;
-    memoryTotal: string;
-    memoryFree: string;
+    memoryTotal: number;
+    memoryFree: number;
     loadAverage: string;
   }
