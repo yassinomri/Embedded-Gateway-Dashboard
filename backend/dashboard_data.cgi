@@ -6,26 +6,21 @@ echo "Access-Control-Allow-Headers: Content-Type"
 echo
 
 # Retrieve memory usage
-memory_info=$(cat /proc/meminfo)
+memory_info=$(cat /proc/meminfo 2>/dev/null || echo "N/A")
 
 # Retrieve bandwidth usage
 tx_rate=""
 rx_rate=""
-for i in $(seq 1 5); do
-  INTERFACE="eth0"
-  # Get initial bytes
-  RX1=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
-  TX1=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
-  sleep 1
-  # Get final bytes
-  RX2=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
-  TX2=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
-  # Calculate rates in Mbps
-  RX_RATE=$(echo "scale=2; ($RX2 - $RX1) * 8 / 1000000" | bc)
-  TX_RATE=$(echo "scale=2; ($TX2 - $TX1) * 8 / 1000000" | bc)
-  rx_rate=$RX_RATE
-  tx_rate=$TX_RATE
-done
+INTERFACE="eth0"
+RX1=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
+TX1=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
+sleep 1
+RX2=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
+TX2=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
+RX_RATE=$(( ($RX2 - $RX1) * 8 / 1000000 ))
+TX_RATE=$(( ($TX2 - $TX1) * 8 / 1000000 ))
+rx_rate=$RX_RATE
+tx_rate=$TX_RATE
 
 # Retrieve active connections using netstat
 active_connections_info=$(netstat -tulnp 2>/dev/null || echo "No active connections found")
@@ -67,13 +62,90 @@ done <<EOF
 $connected_devices_info
 EOF
 
-# Retrieve loadaverage 
+# Retrieve loadaverage
 loadaverage_info=$(cat /proc/loadavg 2>/dev/null || echo "N/A")
 
 # Helper function to escape JSON strings
 json_escape() {
   echo "$1" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
 }
+
+# Properly parse network interfaces with awk
+network_info_json=$(ifconfig 2>/dev/null | awk '
+BEGIN {
+  print "["
+  first_interface = 1
+}
+
+# Start of a new interface block
+/^[a-zA-Z0-9]/ {
+  # Close previous interface block if not the first one
+  if (!first_interface) {
+    print "  },"
+  } else {
+    first_interface = 0
+  }
+  
+  # Start new interface block
+  interface = $1
+  gsub(/:$/, "", interface)  # Remove trailing colon if present
+  printf "  {\n"
+  printf "    \"interface\": \"%s\"", interface
+  
+  # Look for HWaddr in the first line
+  for (i=1; i<=NF; i++) {
+    if ($i == "HWaddr" && i+1 <= NF) {
+      printf ",\n    \"hwaddr\": \"%s\"", $(i+1)
+    }
+  }
+}
+
+# Parse inet addr, Bcast, Mask
+/inet addr:/ {
+  match($0, /inet addr:([^ ]+)/, inet)
+  match($0, /Bcast:([^ ]+)/, bcast)
+  match($0, /Mask:([^ ]+)/, mask)
+  
+  if (inet[1] != "") printf ",\n    \"inet\": \"%s\"", inet[1]
+  if (bcast[1] != "") printf ",\n    \"bcast\": \"%s\"", bcast[1]
+  if (mask[1] != "") printf ",\n    \"mask\": \"%s\"", mask[1]
+}
+
+# Parse inet6 addr
+/inet6 addr:/ {
+  match($0, /inet6 addr:([^ ]+)/, inet6)
+  if (inet6[1] != "") printf ",\n    \"inet6\": \"%s\"", inet6[1]
+}
+
+# Parse MTU
+/MTU:/ {
+  match($0, /MTU:([0-9]+)/, mtu)
+  if (mtu[1] != "") printf ",\n    \"mtu\": \"%s\"", mtu[1]
+}
+
+# Parse RX/TX statistics
+/RX packets:/ {
+  match($0, /RX packets:([0-9]+)/, rx_packets)
+  match($0, /TX packets:([0-9]+)/, tx_packets)
+  if (rx_packets[1] != "") printf ",\n    \"rx_packets\": \"%s\"", rx_packets[1]
+  if (tx_packets[1] != "") printf ",\n    \"tx_packets\": \"%s\"", tx_packets[1]
+}
+
+/RX bytes:/ {
+  match($0, /RX bytes:([0-9]+)/, rx_bytes)
+  match($0, /TX bytes:([0-9]+)/, tx_bytes)
+  if (rx_bytes[1] != "") printf ",\n    \"rx_bytes\": \"%s\"", rx_bytes[1]
+  if (tx_bytes[1] != "") printf ",\n    \"tx_bytes\": \"%s\"", tx_bytes[1]
+}
+
+END {
+  # Close the last interface block and the JSON array
+  if (!first_interface) {
+    print "\n  }"
+  }
+  print "]"
+}
+' 2>/dev/null || echo "[]")
 
 # Output JSON
 cat <<EOF
@@ -92,6 +164,7 @@ cat <<EOF
       "activeRules": $active_rules,
       "totalRules": $total_rules
     }
-  }
+  },
+  "networkInfo": $network_info_json
 }
 EOF

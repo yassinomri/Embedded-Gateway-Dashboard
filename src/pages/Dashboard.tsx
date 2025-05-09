@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; // Assuming you have a Button component
 import { apiClient } from "@/lib/dashboard-api";
-import { DashboardData } from "@/types/dashboard-data";
+import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
 
 
 // Function to format memory values
@@ -140,11 +140,15 @@ const Dashboard: React.FC = () => {
   // Parse load average
   const loadAverage = useMemo(() => {
     if (!dashboardData?.loadaverageInfo) return "N/A";
-    const loadLine = dashboardData.loadaverageInfo
-      .toString()
-      .split("\n")
-      .find((line) => line.includes("load average"));
-    return loadLine?.split(":")[1]?.trim() || "N/A";
+
+    const loadValues = dashboardData.loadaverageInfo.split(" ");
+    if (loadValues.length < 3) return "N/A";
+
+    const oneMinute = loadValues[0];
+    const fiveMinutes = loadValues[1];
+    const fifteenMinutes = loadValues[2];
+
+    return `${oneMinute} (1 min), ${fiveMinutes} (5 min), ${fifteenMinutes} (15 min)`;
   }, [dashboardData?.loadaverageInfo]);
 
   // Memory usage chart data
@@ -275,6 +279,22 @@ const Dashboard: React.FC = () => {
         };
       });
   }, [dashboardData?.activeConnectionsInfo]);
+
+  const networkInterfaces = useMemo(() => {
+    if (!dashboardData?.networkInfo) return [];
+
+    return dashboardData.networkInfo.map((interfaceData: NetworkInterface) => ({
+      name: interfaceData.interface || "N/A",
+      mac: interfaceData.hwaddr || "N/A",
+      ipv4: interfaceData.inet || "N/A",
+      ipv6: interfaceData.inet6 || "N/A",
+      rxBytes: interfaceData.rxBytes || "0",
+      txBytes: interfaceData.txBytes || "0",
+      rxPackets: interfaceData.rxPackets || "0",
+      txPackets: interfaceData.txPackets || "0",
+      mtu: interfaceData.mtu || "N/A",
+    }));
+  }, [dashboardData?.networkInfo]);
 
   if (loading) return loadingContent;
   if (error) return errorContent;
@@ -513,6 +533,48 @@ const Dashboard: React.FC = () => {
               </div>
             ) : (
               <p>No active connections found.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Network Interfaces Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Network Interfaces</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {networkInterfaces.length > 0 ? (
+              <div className="overflow-y-auto max-h-96">
+                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2 border border-gray-300">Interface</th>
+                      <th className="px-4 py-2 border border-gray-300">MAC Address</th>
+                      <th className="px-4 py-2 border border-gray-300">IPv4</th>
+                      <th className="px-4 py-2 border border-gray-300">IPv6</th>
+                      <th className="px-4 py-2 border border-gray-300">RX Bytes</th>
+                      <th className="px-4 py-2 border border-gray-300">TX Bytes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {networkInterfaces.map((iface, index) => (
+                      <tr
+                        key={index}
+                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                      >
+                        <td className="px-4 py-2 border border-gray-300">{iface.name}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.mac}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.ipv4}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.ipv6}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.rxBytes}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.txBytes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>No network interfaces found.</p>
             )}
           </CardContent>
         </Card>

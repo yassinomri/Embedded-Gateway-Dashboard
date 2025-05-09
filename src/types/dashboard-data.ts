@@ -14,4 +14,19 @@ export interface DashboardData {
       totalRules: number; // Total number of rules
     };
   };
+  networkInfo: NetworkInterface[]; // Parsed output of ifconfig
+}
+
+export interface NetworkInterface {
+  interface: string; // Interface name (e.g., br-lan, eth0)
+  hwaddr: string; // MAC address
+  inet: string; // IPv4 address
+  inet6: string; // IPv6 address
+  mask: string; // Subnet mask
+  bcast: string; // Broadcast address
+  mtu: string; // MTU value
+  rxBytes: string; // Received bytes
+  txBytes: string; // Transmitted bytes
+  rxPackets: string; // Received packets
+  txPackets: string; // Transmitted packets
 }
