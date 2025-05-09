@@ -288,10 +288,10 @@ const Dashboard: React.FC = () => {
       mac: interfaceData.hwaddr || "N/A",
       ipv4: interfaceData.inet || "N/A",
       ipv6: interfaceData.inet6 || "N/A",
-      rxBytes: interfaceData.rxBytes || "0",
-      txBytes: interfaceData.txBytes || "0",
-      rxPackets: interfaceData.rxPackets || "0",
-      txPackets: interfaceData.txPackets || "0",
+      rxBytes: interfaceData.rx_bytes || "0",
+      txBytes: interfaceData.tx_bytes || "0",
+      rxPackets: interfaceData.rx_packets || "0",
+      txPackets: interfaceData.tx_packets || "0",
       mtu: interfaceData.mtu || "N/A",
     }));
   }, [dashboardData?.networkInfo]);
