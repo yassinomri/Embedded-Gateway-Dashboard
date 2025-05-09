@@ -16,6 +16,22 @@ const formatMemory = (value: number): string => {
   }
 };
 
+// Function to format bytes
+const formatBytes = (bytes: string | number, decimals: number = 2): string => {
+  if (!bytes) return "0 B";
+  
+  const value = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
+  if (value === 0) return "0 B";
+  
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+  
+  const i = Math.floor(Math.log(value) / Math.log(k));
+  
+  return `${parseFloat((value / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+};
+
 
 const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
 const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
@@ -288,10 +304,10 @@ const Dashboard: React.FC = () => {
       mac: interfaceData.hwaddr || "N/A",
       ipv4: interfaceData.inet || "N/A",
       ipv6: interfaceData.inet6 || "N/A",
-      rxBytes: interfaceData.rx_bytes || "0",
-      txBytes: interfaceData.tx_bytes || "0",
-      rxPackets: interfaceData.rx_packets || "0",
-      txPackets: interfaceData.tx_packets || "0",
+      rxBytes: formatBytes(interfaceData.rx_bytes) || "0",
+      txBytes: formatBytes(interfaceData.tx_bytes) || "0",
+      rxPackets: formatBytes(interfaceData.rx_packets) || "0",
+      txPackets: formatBytes(interfaceData.tx_packets) || "0",
       mtu: interfaceData.mtu || "N/A",
     }));
   }, [dashboardData?.networkInfo]);
@@ -462,6 +478,48 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
+                {/* Network Interfaces Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Network Interfaces</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {networkInterfaces.length > 0 ? (
+              <div className="overflow-y-auto max-h-96">
+                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2 border border-gray-300">Interface</th>
+                      <th className="px-4 py-2 border border-gray-300">MAC Address</th>
+                      <th className="px-4 py-2 border border-gray-300">IPv4</th>
+                      <th className="px-4 py-2 border border-gray-300">IPv6</th>
+                      <th className="px-4 py-2 border border-gray-300">RX Bytes</th>
+                      <th className="px-4 py-2 border border-gray-300">TX Bytes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {networkInterfaces.map((iface, index) => (
+                      <tr
+                        key={index}
+                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                      >
+                        <td className="px-4 py-2 border border-gray-300">{iface.name}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.mac}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.ipv4}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.ipv6}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.rxBytes}</td>
+                        <td className="px-4 py-2 border border-gray-300">{iface.txBytes}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>No network interfaces found.</p>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Connected Devices */}
         <Card className="col-span-4"> {/* Adjust grid span to give more space */}
           <CardHeader>
@@ -537,47 +595,7 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Network Interfaces Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Network Interfaces</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {networkInterfaces.length > 0 ? (
-              <div className="overflow-y-auto max-h-96">
-                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2 border border-gray-300">Interface</th>
-                      <th className="px-4 py-2 border border-gray-300">MAC Address</th>
-                      <th className="px-4 py-2 border border-gray-300">IPv4</th>
-                      <th className="px-4 py-2 border border-gray-300">IPv6</th>
-                      <th className="px-4 py-2 border border-gray-300">RX Bytes</th>
-                      <th className="px-4 py-2 border border-gray-300">TX Bytes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {networkInterfaces.map((iface, index) => (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                      >
-                        <td className="px-4 py-2 border border-gray-300">{iface.name}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.mac}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.ipv4}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.ipv6}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.rxBytes}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.txBytes}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p>No network interfaces found.</p>
-            )}
-          </CardContent>
-        </Card>
+
       </div>
     </div>
   );
