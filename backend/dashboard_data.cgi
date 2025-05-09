@@ -70,82 +70,80 @@ json_escape() {
   echo "$1" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g'
 }
 
-# Properly parse network interfaces with awk
-network_info_json=$(ifconfig 2>/dev/null | awk '
-BEGIN {
-  print "["
-  first_interface = 1
-}
-
-# Start of a new interface block
-/^[a-zA-Z0-9]/ {
-  # Close previous interface block if not the first one
-  if (!first_interface) {
-    print "  },"
-  } else {
-    first_interface = 0
-  }
+# Collect network info using a more robust approach combining ip and ifconfig
+collect_network_info() {
+  # Initialize an empty array for storing interface info
+  echo "["
   
-  # Start new interface block
-  interface = $1
-  gsub(/:$/, "", interface)  # Remove trailing colon if present
-  printf "  {\n"
-  printf "    \"interface\": \"%s\"", interface
+  # Get list of interfaces (excluding loopback if desired)
+  interfaces=$(ip -o link show | awk -F': ' '{print $2}' | sort)
+  first=true
   
-  # Look for HWaddr in the first line
-  for (i=1; i<=NF; i++) {
-    if ($i == "HWaddr" && i+1 <= NF) {
-      printf ",\n    \"hwaddr\": \"%s\"", $(i+1)
-    }
-  }
-}
-
-# Parse inet addr, Bcast, Mask
-/inet addr:/ {
-  match($0, /inet addr:([^ ]+)/, inet)
-  match($0, /Bcast:([^ ]+)/, bcast)
-  match($0, /Mask:([^ ]+)/, mask)
+  # Process each interface
+  for iface in $interfaces; do
+    if [ "$first" = true ]; then
+      first=false
+    else
+      echo ","
+    fi
+    
+    echo "  {"
+    echo "    \"interface\": \"$iface\""
+    
+    # MAC address
+    mac=$(ip -o link show dev "$iface" 2>/dev/null | awk '{print $17}')
+    if [ -n "$mac" ] && [ "$mac" != "00:00:00:00:00:00" ]; then
+      echo "    ,\"hwaddr\": \"$mac\""
+    fi
+    
+    # IPv4 address, netmask and broadcast
+    ipv4_info=$(ip -o -4 addr show dev "$iface" 2>/dev/null | head -n 1)
+    if [ -n "$ipv4_info" ]; then
+      ipv4_addr=$(echo "$ipv4_info" | awk '{print $4}' | cut -d/ -f1)
+      ipv4_cidr=$(echo "$ipv4_info" | awk '{print $4}' | cut -d/ -f2)
+      echo "    ,\"inet\": \"$ipv4_addr\""
+      echo "    ,\"cidr\": \"$ipv4_cidr\""
+      
+      # Try to get broadcast address
+      bcast=$(ip -o -4 addr show dev "$iface" 2>/dev/null | grep -o 'brd [^ ]*' | awk '{print $2}')
+      if [ -n "$bcast" ]; then
+        echo "    ,\"bcast\": \"$bcast\""
+      fi
+    fi
+    
+    # IPv6 address
+    ipv6_addr=$(ip -o -6 addr show dev "$iface" 2>/dev/null | head -n 1 | awk '{print $4}' | cut -d/ -f1)
+    if [ -n "$ipv6_addr" ]; then
+      echo "    ,\"inet6\": \"$ipv6_addr\""
+    fi
+    
+    # MTU
+    mtu=$(ip -o link show dev "$iface" 2>/dev/null | awk '{print $5}')
+    if [ -n "$mtu" ]; then
+      echo "    ,\"mtu\": \"$mtu\""
+    fi
+    
+    # RX/TX statistics
+    if [ -d "/sys/class/net/$iface/statistics" ]; then
+      rx_bytes=$(cat "/sys/class/net/$iface/statistics/rx_bytes" 2>/dev/null || echo "0")
+      tx_bytes=$(cat "/sys/class/net/$iface/statistics/tx_bytes" 2>/dev/null || echo "0")
+      rx_packets=$(cat "/sys/class/net/$iface/statistics/rx_packets" 2>/dev/null || echo "0")
+      tx_packets=$(cat "/sys/class/net/$iface/statistics/tx_packets" 2>/dev/null || echo "0")
+      
+      echo "    ,\"rx_bytes\": \"$rx_bytes\""
+      echo "    ,\"tx_bytes\": \"$tx_bytes\""
+      echo "    ,\"rx_packets\": \"$rx_packets\""
+      echo "    ,\"tx_packets\": \"$tx_packets\""
+    fi
+    
+    echo "  }"
+  done
   
-  if (inet[1] != "") printf ",\n    \"inet\": \"%s\"", inet[1]
-  if (bcast[1] != "") printf ",\n    \"bcast\": \"%s\"", bcast[1]
-  if (mask[1] != "") printf ",\n    \"mask\": \"%s\"", mask[1]
+  echo "]"
 }
 
-# Parse inet6 addr
-/inet6 addr:/ {
-  match($0, /inet6 addr:([^ ]+)/, inet6)
-  if (inet6[1] != "") printf ",\n    \"inet6\": \"%s\"", inet6[1]
-}
-
-# Parse MTU
-/MTU:/ {
-  match($0, /MTU:([0-9]+)/, mtu)
-  if (mtu[1] != "") printf ",\n    \"mtu\": \"%s\"", mtu[1]
-}
-
-# Parse RX/TX statistics
-/RX packets:/ {
-  match($0, /RX packets:([0-9]+)/, rx_packets)
-  match($0, /TX packets:([0-9]+)/, tx_packets)
-  if (rx_packets[1] != "") printf ",\n    \"rx_packets\": \"%s\"", rx_packets[1]
-  if (tx_packets[1] != "") printf ",\n    \"tx_packets\": \"%s\"", tx_packets[1]
-}
-
-/RX bytes:/ {
-  match($0, /RX bytes:([0-9]+)/, rx_bytes)
-  match($0, /TX bytes:([0-9]+)/, tx_bytes)
-  if (rx_bytes[1] != "") printf ",\n    \"rx_bytes\": \"%s\"", rx_bytes[1]
-  if (tx_bytes[1] != "") printf ",\n    \"tx_bytes\": \"%s\"", tx_bytes[1]
-}
-
-END {
-  # Close the last interface block and the JSON array
-  if (!first_interface) {
-    print "\n  }"
-  }
-  print "]"
-}
-' 2>/dev/null || echo "[]")
+# Get network info using the more robust approach
+network_info_json=$(collect_network_info 2>/dev/null || echo "[]")
 
 # Output JSON
 cat <<EOF
