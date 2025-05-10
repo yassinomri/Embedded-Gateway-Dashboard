@@ -32,6 +32,20 @@ const formatBytes = (bytes: string | number, decimals: number = 2): string => {
   return `${parseFloat((value / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 };
 
+// Function to format bandwidth values
+const formatBandwidth = (value: string | number): string => {
+  if (!value) return "0 Kbps";
+
+  const numericValue = typeof value === "string" ? parseFloat(value) : value;
+
+  if (numericValue < 1) {
+    // Convert to Kbps if less than 1 Mbps
+    return `${(numericValue * 1000).toFixed(2)} Kbps`;
+  }
+
+  // Keep in Mbps if 1 or greater
+  return `${numericValue.toFixed(2)} Mbps`;
+};
 
 const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
 const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
@@ -229,22 +243,29 @@ const Dashboard: React.FC = () => {
   // Bandwidth chart data
   const bandwidthChartData = useMemo(() => {
     const { labels, uploadData, downloadData } = bandwidthData;
-    
+
     if (labels.length === 0) return null;
-    
+
+    const formattedUploadData = uploadData.map((value) =>
+      value < 1 ? value * 1000 : value
+    );
+    const formattedDownloadData = downloadData.map((value) =>
+      value < 1 ? value * 1000 : value
+    );
+
     return {
       labels,
       datasets: [
         {
-          label: "Upload (Mbps)",
-          data: uploadData,
+          label: "Upload (Kbps/Mbps)",
+          data: formattedUploadData,
           borderColor: "#FF6384",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           fill: false,
         },
         {
-          label: "Download (Mbps)",
-          data: downloadData,
+          label: "Download (Kbps/Mbps)",
+          data: formattedDownloadData,
           borderColor: "#36A2EB",
           backgroundColor: "rgba(54, 162, 235, 0.2)",
           fill: false,
@@ -417,10 +438,10 @@ const Dashboard: React.FC = () => {
               <div className="flex justify-between items-center">
                 <div>
                   <p>
-                    <strong>Upload Rate:</strong> {dashboardData?.bandwidthInfo.txRate || "N/A"}
+                    <strong>Upload Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.txRate || "0")}
                   </p>
                   <p>
-                    <strong>Download Rate:</strong> {dashboardData?.bandwidthInfo.rxRate || "N/A"}
+                    <strong>Download Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.rxRate || "0")}
                   </p>
                 </div>
               </div>
