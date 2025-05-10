@@ -418,7 +418,7 @@ const Dashboard: React.FC = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {/* System Status */}
-        <Card>
+        <Card className="col-span-2"> {/* Adjust grid span to give more space */}
           <CardHeader>
             <CardTitle>System Status</CardTitle>
           </CardHeader>
@@ -504,35 +504,8 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Bandwidth Usage */}
-        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
-          <CardHeader>
-            <CardTitle>Bandwidth Usage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Bandwidth Rates */}
-              <div className="flex justify-between items-center">
-                <div>
-                  <p>
-                    <strong>Upload Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.txRate || "0")}
-                  </p>
-                  <p>
-                    <strong>Download Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.rxRate || "0")}
-                  </p>
-                </div>
-              </div>
-
-              {/* Bandwidth Chart */}
-              <Suspense fallback={<p>Loading chart...</p>}>
-                {bandwidthChartData && <Line data={bandwidthChartData} />}
-              </Suspense>
-            </div>
-          </CardContent>
-        </Card>
-
-                {/* Firewall Status */}
-        <Card>
+        {/* Firewall Status */}
+        <Card className="col-span-2"> {/* Adjust grid span to give more space */}
           <CardHeader>
             <CardTitle>Firewall</CardTitle>
           </CardHeader>
@@ -575,6 +548,35 @@ const Dashboard: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Bandwidth Usage */}
+        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+          <CardHeader>
+            <CardTitle>Bandwidth Usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Bandwidth Rates */}
+              <div className="flex justify-between items-center">
+                <div>
+                  <p>
+                    <strong>Upload Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.txRate || "0")}
+                  </p>
+                  <p>
+                    <strong>Download Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.rxRate || "0")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Bandwidth Chart */}
+              <Suspense fallback={<p>Loading chart...</p>}>
+                {bandwidthChartData && <Line data={bandwidthChartData} />}
+              </Suspense>
+            </div>
+          </CardContent>
+        </Card>
+
+
 
                 {/* Network Interfaces Section */}
         <Card>
@@ -689,132 +691,6 @@ const Dashboard: React.FC = () => {
               </div>
             ) : (
               <p>No active connections found.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Bandwidth Over Time Graph */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bandwidth Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <Suspense fallback={<p>Loading graph...</p>}>
-                {historicalChartData ? (
-                  <Line
-                    data={historicalChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          display: true,
-                          position: "top",
-                        },
-                      },
-                      scales: {
-                        x: {
-                          title: {
-                            display: true,
-                            text: "Time",
-                          },
-                        },
-                        y: {
-                          title: {
-                            display: true,
-                            text: "Bandwidth (Mbps)",
-                          },
-                          beginAtZero: true,
-                        },
-                      },
-                    }}
-                  />
-                ) : (
-                  <p>No historical data available.</p>
-                )}
-              </Suspense>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bandwidth Usage Graph */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bandwidth Usage Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64">
-              <Suspense fallback={<p>Loading graph...</p>}>
-                {bandwidthChartData ? (
-                  <Line
-                    data={bandwidthChartData}
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: false,
-                      plugins: {
-                        legend: {
-                          display: true,
-                          position: "top",
-                        },
-                      },
-                      scales: {
-                        x: {
-                          title: {
-                            display: true,
-                            text: "Time",
-                          },
-                        },
-                        y: {
-                          title: {
-                            display: true,
-                            text: "Bandwidth (Mbps)",
-                          },
-                          beginAtZero: true,
-                        },
-                      },
-                    }}
-                  />
-                ) : (
-                  <p>No bandwidth data available.</p>
-                )}
-              </Suspense>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bandwidth Over Time Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bandwidth Usage Over Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {bandwidthHistory.length > 0 ? (
-              <div className="overflow-y-auto max-h-96">
-                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2 border border-gray-300">Time</th>
-                      <th className="px-4 py-2 border border-gray-300">Upload Rate (Mbps)</th>
-                      <th className="px-4 py-2 border border-gray-300">Download Rate (Mbps)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bandwidthHistory.map((entry, index) => (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} // Alternating row colors
-                      >
-                        <td className="px-4 py-2 border border-gray-300">{entry.time}</td>
-                        <td className="px-4 py-2 border border-gray-300">{entry.uploadRate.toFixed(2)} Mbps</td>
-                        <td className="px-4 py-2 border border-gray-300">{entry.downloadRate.toFixed(2)} Mbps</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p>No historical bandwidth data available.</p>
             )}
           </CardContent>
         </Card>
