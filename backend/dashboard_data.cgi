@@ -8,17 +8,25 @@ echo
 # Retrieve memory usage
 memory_info=$(cat /proc/meminfo 2>/dev/null || echo "N/A")
 
-# Retrieve bandwidth usage
+# Retrieve bandwidth usage for br-lan
+BC="/usr/bin/bc"
 tx_rate=""
 rx_rate=""
-INTERFACE="eth0"
+INTERFACE="br-lan"
+# Get initial RX/TX bytes
 RX1=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
 TX1=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
-sleep 1
+sleep 5  # Increase sleep interval to 5 seconds
+# Get final RX/TX bytes
 RX2=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
 TX2=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
-RX_RATE=$(( ($RX2 - $RX1) * 8 / 1000000 ))
-TX_RATE=$(( ($TX2 - $TX1) * 8 / 1000000 ))
+# Debugging
+echo "DEBUG: RX1=$RX1, RX2=$RX2, TX1=$TX1, TX2=$TX2" >&2
+# Calculate rates in Mbps using bc
+RX_DIFF=$(echo "$RX2 - $RX1" | $BC)
+TX_DIFF=$(echo "$TX2 - $TX1" | $BC)
+RX_RATE=$(echo "scale=4; (($RX2 - $RX1) * 8) / (1000000 * 5)" | $BC)
+TX_RATE=$(echo "scale=4; (($TX2 - $TX1) * 8) / (1000000 * 5)" | $BC)
 rx_rate=$RX_RATE
 tx_rate=$TX_RATE
 
@@ -26,7 +34,7 @@ tx_rate=$TX_RATE
 active_connections_info=$(netstat -tulnp 2>/dev/null || echo "No active connections found")
 
 # Determine if firewall is enabled
-firewall_enabled=$(uci get firewall.enabled 2>/dev/null || echo "0")
+firewall_enabled=$(uci get firewall.@defaults[0].enabled 2>/dev/null || echo "0")
 if [ "$firewall_enabled" -eq 1 ]; then
   firewall_enabled="true"
 else
@@ -150,8 +158,8 @@ cat <<EOF
 {
   "memoryInfo": "$(json_escape "$memory_info")",
   "bandwidthInfo": {
-    "txRate": "$(json_escape "$tx_rate")",
-    "rxRate": "$(json_escape "$rx_rate")"
+    "txRate": "$tx_rate",
+    "rxRate": "$rx_rate"
   },
   "activeConnectionsInfo": "$(json_escape "$active_connections_info")",
   "connectedDevicesInfo": "$(json_escape "$formatted_devices")",

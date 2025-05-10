@@ -23,7 +23,7 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     echo "$(date): GET request started" >> /tmp/firewall_cgi.log
 
     # Get enabled status
-    ENABLED=$(uci get firewall.enabled 2>/dev/null || echo 1)
+    ENABLED=$(uci get firewall.@defaults[0].enabled 2>/dev/null || echo 1)
     echo "$(date): Enabled fetched: $ENABLED" >> /tmp/firewall_cgi.log
 
     # Build JSON manually
@@ -89,7 +89,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     ENABLED=$(echo "$POST_DATA" | sed -n 's/.*"enabled"[ ]*:[ ]*\([^,}\ ]*\).*/\1/p')
     if [ "$ENABLED" = "true" ] || [ "$ENABLED" = "false" ]; then
         [ "$ENABLED" = "true" ] && UCI_ENABLED="1" || UCI_ENABLED="0"
-        uci set firewall.enabled="$UCI_ENABLED" 2>/dev/null
+        uci set firewall.@defaults[0].enabled="$UCI_ENABLED" 2>/dev/null
     fi
 
     # Parse rules array for add or update
