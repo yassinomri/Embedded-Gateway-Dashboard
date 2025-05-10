@@ -1,5 +1,13 @@
 import Dexie, { Table } from 'dexie';
-import { HistoryEntry } from '../lib/performance-api';
+
+export interface HistoryEntry {
+  time: string;
+  latency: number;
+  packetLoss: number;
+  throughput: number;
+  uploadRate: number; // Upload rate in Mbps
+  downloadRate: number; // Download rate in Mbps
+}
 
 class PerformanceDB extends Dexie {
   performanceData!: Table<HistoryEntry & { id?: number }>;
@@ -8,7 +16,7 @@ class PerformanceDB extends Dexie {
   constructor() {
     super('PerformanceDB');
     this.version(2).stores({
-      performanceData: '++id, time, latency, packetLoss, throughput',
+      performanceData: '++id, time, latency, packetLoss, throughput, uploadRate, downloadRate',
       settings: 'key',
     });
   }
@@ -27,10 +35,12 @@ export const savePerformanceData = async (metrics: {
       latency: metrics.latency,
       packetLoss: metrics.packetLoss,
       throughput: metrics.throughput,
+      uploadRate: 0, // Default value for upload rate
+      downloadRate: 0, // Default value for download rate
     };
     await db.performanceData.add(entry);
   } catch (error) {
-    console.error('Error saving to IndexedDB:', error);
+    console.error('Error saving performance data to IndexedDB:', error);
   }
 };
 
@@ -75,5 +85,45 @@ export const getTargetIp = async (): Promise<string | null> => {
   } catch (error) {
     console.error('Error fetching target IP:', error);
     return null;
+  }
+};
+
+export const saveBandwidthData = async (bandwidth: {
+  uploadRate: number;
+  downloadRate: number;
+}) => {
+  try {
+    const entry: HistoryEntry = {
+      time: new Date().toISOString(),
+      latency: 0, // Default value for latency
+      packetLoss: 0, // Default value for packet loss
+      throughput: 0, // Default value for throughput
+      uploadRate: bandwidth.uploadRate,
+      downloadRate: bandwidth.downloadRate,
+    };
+    await db.performanceData.add(entry);
+  } catch (error) {
+    console.error('Error saving bandwidth data to IndexedDB:', error);
+  }
+};
+
+export const getBandwidthData = async (limit: number = 50): Promise<
+  { time: string; uploadRate: number; downloadRate: number }[]
+> => {
+  try {
+    const data = await db.performanceData
+      .orderBy('time')
+      .reverse()
+      .limit(limit)
+      .toArray();
+
+    return data.map(entry => ({
+      time: entry.time,
+      uploadRate: entry.uploadRate || 0,
+      downloadRate: entry.downloadRate || 0,
+    }));
+  } catch (error) {
+    console.error('Error fetching bandwidth data from IndexedDB:', error);
+    return [];
   }
 };

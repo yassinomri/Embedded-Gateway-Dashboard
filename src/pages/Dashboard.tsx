@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; // Assuming you have a Button component
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
-
+import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
 
 // Function to format memory values
 const formatMemory = (value: number): string => {
@@ -76,6 +76,10 @@ const Dashboard: React.FC = () => {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [historicalData, setHistoricalData] = useState<{ time: string; throughput: number }[]>([]);
+  const [bandwidthHistory, setBandwidthHistory] = useState<
+    { time: string; uploadRate: number; downloadRate: number }[]
+  >([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,6 +105,71 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     console.log("Connected Devices Info:", dashboardData?.connectedDevicesInfo);
   }, [dashboardData?.connectedDevicesInfo]);
+
+  useEffect(() => {
+    const saveBandwidthData = async () => {
+      if (dashboardData?.bandwidthInfo) {
+        const txRate = parseFloat(dashboardData.bandwidthInfo.txRate || "0");
+        const rxRate = parseFloat(dashboardData.bandwidthInfo.rxRate || "0");
+
+        await savePerformanceData({
+          latency: 0, // Placeholder if latency is not available
+          packetLoss: 0, // Placeholder if packet loss is not available
+          throughput: txRate + rxRate, // Total bandwidth (upload + download)
+        });
+      }
+    };
+
+    const interval = setInterval(saveBandwidthData, 5000); // Save every 5 seconds
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [dashboardData?.bandwidthInfo]);
+
+  useEffect(() => {
+    const fetchHistoricalData = async () => {
+      const data = await getHistoricalData(50); // Fetch the last 50 entries
+      setHistoricalData(data.map(entry => ({
+        time: new Date(entry.time).toLocaleTimeString(), // Format time for the graph
+        throughput: entry.throughput, // Total bandwidth
+      })));
+    };
+
+    fetchHistoricalData();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const data = await getHistoricalData(50);
+      setHistoricalData(data.map(entry => ({
+        time: new Date(entry.time).toLocaleTimeString(),
+        throughput: entry.throughput,
+      })));
+    }, 5000); // Update every 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, []);
+
+  useEffect(() => {
+    const saveBandwidth = async () => {
+      if (dashboardData?.bandwidthInfo) {
+        const uploadRate = parseFloat(dashboardData.bandwidthInfo.txRate || "0");
+        const downloadRate = parseFloat(dashboardData.bandwidthInfo.rxRate || "0");
+
+        await saveBandwidthData({ uploadRate, downloadRate });
+      }
+    };
+
+    const interval = setInterval(saveBandwidth, 5000); // Save every 5 seconds
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [dashboardData?.bandwidthInfo]);
+
+  useEffect(() => {
+    const fetchBandwidthHistory = async () => {
+      const data = await getBandwidthData(50); // Fetch the last 50 entries
+      setBandwidthHistory(data);
+    };
+
+    fetchBandwidthHistory();
+  }, []);
 
   const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
   const errorContent = error ? <p className="text-red-500">{error}</p> : null;
@@ -242,37 +311,28 @@ const Dashboard: React.FC = () => {
 
   // Bandwidth chart data
   const bandwidthChartData = useMemo(() => {
-    const { labels, uploadData, downloadData } = bandwidthData;
-
-    if (labels.length === 0) return null;
-
-    const formattedUploadData = uploadData.map((value) =>
-      value < 1 ? value * 1000 : value
-    );
-    const formattedDownloadData = downloadData.map((value) =>
-      value < 1 ? value * 1000 : value
-    );
+    if (bandwidthHistory.length === 0) return null;
 
     return {
-      labels,
+      labels: bandwidthHistory.map(entry => entry.time), // Time labels
       datasets: [
         {
-          label: "Upload (Kbps/Mbps)",
-          data: formattedUploadData,
+          label: "Upload Rate (Mbps)",
+          data: bandwidthHistory.map(entry => entry.uploadRate),
           borderColor: "#FF6384",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
-          fill: false,
+          fill: true,
         },
         {
-          label: "Download (Kbps/Mbps)",
-          data: formattedDownloadData,
+          label: "Download Rate (Mbps)",
+          data: bandwidthHistory.map(entry => entry.downloadRate),
           borderColor: "#36A2EB",
           backgroundColor: "rgba(54, 162, 235, 0.2)",
-          fill: false,
+          fill: true,
         },
       ],
     };
-  }, [bandwidthData]);
+  }, [bandwidthHistory]);
 
   // Parse connected devices info
   const connectedDevices = useMemo(() => {
@@ -332,6 +392,23 @@ const Dashboard: React.FC = () => {
       mtu: interfaceData.mtu || "N/A",
     }));
   }, [dashboardData?.networkInfo]);
+
+  const historicalChartData = useMemo(() => {
+    if (historicalData.length === 0) return null;
+  
+    return {
+      labels: historicalData.map(entry => entry.time), // Time labels
+      datasets: [
+        {
+          label: "Total Bandwidth (Mbps)",
+          data: historicalData.map(entry => entry.throughput),
+          borderColor: "#36A2EB",
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          fill: true,
+        },
+      ],
+    };
+  }, [historicalData]);
 
   if (loading) return loadingContent;
   if (error) return errorContent;
@@ -428,7 +505,7 @@ const Dashboard: React.FC = () => {
         </Card>
 
         {/* Bandwidth Usage */}
-        <Card>
+        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
           <CardHeader>
             <CardTitle>Bandwidth Usage</CardTitle>
           </CardHeader>
@@ -616,6 +693,131 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Bandwidth Over Time Graph */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bandwidth Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <Suspense fallback={<p>Loading graph...</p>}>
+                {historicalChartData ? (
+                  <Line
+                    data={historicalChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          display: true,
+                          position: "top",
+                        },
+                      },
+                      scales: {
+                        x: {
+                          title: {
+                            display: true,
+                            text: "Time",
+                          },
+                        },
+                        y: {
+                          title: {
+                            display: true,
+                            text: "Bandwidth (Mbps)",
+                          },
+                          beginAtZero: true,
+                        },
+                      },
+                    }}
+                  />
+                ) : (
+                  <p>No historical data available.</p>
+                )}
+              </Suspense>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bandwidth Usage Graph */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bandwidth Usage Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <Suspense fallback={<p>Loading graph...</p>}>
+                {bandwidthChartData ? (
+                  <Line
+                    data={bandwidthChartData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          display: true,
+                          position: "top",
+                        },
+                      },
+                      scales: {
+                        x: {
+                          title: {
+                            display: true,
+                            text: "Time",
+                          },
+                        },
+                        y: {
+                          title: {
+                            display: true,
+                            text: "Bandwidth (Mbps)",
+                          },
+                          beginAtZero: true,
+                        },
+                      },
+                    }}
+                  />
+                ) : (
+                  <p>No bandwidth data available.</p>
+                )}
+              </Suspense>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Bandwidth Over Time Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Bandwidth Usage Over Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {bandwidthHistory.length > 0 ? (
+              <div className="overflow-y-auto max-h-96">
+                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-2 border border-gray-300">Time</th>
+                      <th className="px-4 py-2 border border-gray-300">Upload Rate (Mbps)</th>
+                      <th className="px-4 py-2 border border-gray-300">Download Rate (Mbps)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bandwidthHistory.map((entry, index) => (
+                      <tr
+                        key={index}
+                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} // Alternating row colors
+                      >
+                        <td className="px-4 py-2 border border-gray-300">{entry.time}</td>
+                        <td className="px-4 py-2 border border-gray-300">{entry.uploadRate.toFixed(2)} Mbps</td>
+                        <td className="px-4 py-2 border border-gray-300">{entry.downloadRate.toFixed(2)} Mbps</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p>No historical bandwidth data available.</p>
+            )}
+          </CardContent>
+        </Card>
 
       </div>
     </div>
