@@ -86,9 +86,9 @@ const System: React.FC = () => {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="border-l-4 border-l-blue-500 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center gap-2">
-            <Server className="h-5 w-5" />
+            <Server className="h-5 w-5 text-blue-500" />
             <CardTitle>System</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -107,9 +107,9 @@ const System: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-amber-500 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center gap-2">
-            <Clock className="h-5 w-5" />
+            <Clock className="h-5 w-5 text-amber-500" />
             <CardTitle>Uptime & Load</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -124,9 +124,9 @@ const System: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-green-500 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center gap-2">
-            <Cpu className="h-5 w-5" />
+            <Cpu className="h-5 w-5 text-green-500" />
             <CardTitle>CPU</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -141,9 +141,9 @@ const System: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-l-4 border-l-purple-500 shadow-md hover:shadow-lg transition-all">
           <CardHeader className="flex flex-row items-center gap-2">
-            <HardDrive className="h-5 w-5" />
+            <HardDrive className="h-5 w-5 text-purple-500" />
             <CardTitle>Memory</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
