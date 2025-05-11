@@ -350,7 +350,7 @@ export default function Dashboard() {
   
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <SyncManager />
+      <SyncManager autoSync={true} />
       
       {/* System Status Header - Always visible */}
       <div className="flex items-center justify-between mb-4">
@@ -667,6 +667,7 @@ export default function Dashboard() {
     </div>
   );
 };
+
 
 
 

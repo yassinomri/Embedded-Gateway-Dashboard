@@ -4,16 +4,47 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
 
-export function SyncManager() {
+export function SyncManager({ autoSync = false }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [syncResult, setSyncResult] = useState({ success: 0, failed: 0 });
+  const [systemOnline, setSystemOnline] = useState(false);
+
+  // Check if system is online
+  const checkOnlineStatus = async () => {
+    try {
+      const response = await fetch("http://192.168.1.1/cgi-bin/ping.cgi", {
+        signal: AbortSignal.timeout(3000)
+      });
+      setSystemOnline(response.ok);
+      return response.ok;
+    } catch (error) {
+      setSystemOnline(false);
+      return false;
+    }
+  };
 
   useEffect(() => {
+    // Initial check for pending configs
     const count = getPendingConfigs().length;
     setPendingCount(count);
-  }, []);
+    
+    // Check online status
+    checkOnlineStatus();
+    
+    // Set up interval to check online status
+    const intervalId = setInterval(async () => {
+      const isOnline = await checkOnlineStatus();
+      
+      // Auto-sync if we're online, have pending configs, and autoSync is enabled
+      if (isOnline && getPendingConfigs().length > 0 && autoSync && !syncing) {
+        syncConfigs();
+      }
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(intervalId);
+  }, [autoSync, syncing]);
 
   const syncConfigs = async () => {
     setSyncing(true);
