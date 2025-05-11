@@ -4,9 +4,8 @@ export interface NetworkData {
     name: string;
     status: string;
     macAddress: string;
-    ipAddress: string;
     netmask: string;
-    gateway?: string;
+    gateway: string;
   }[];
 }
 

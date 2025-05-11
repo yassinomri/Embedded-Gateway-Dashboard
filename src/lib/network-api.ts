@@ -53,7 +53,7 @@ export const apiClient = {
 
   updateInterface: async (
     id: string,
-    data: { address: string; gateway?: string; status: string }
+    data: { gateway: string }
   ): Promise<{ status: string; message: string }> => {
     const url = "http://192.168.1.1/cgi-bin/network.cgi";
     console.log("updateInterface Request:", { url, id, data });
@@ -65,8 +65,7 @@ export const apiClient = {
       },
       body: JSON.stringify({
         interface: id,
-        ip: data.address,
-        gateway: data.gateway || "",
+        gateway: data.gateway,
       }),
     });
 
@@ -82,28 +81,90 @@ export const apiClient = {
       throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
     }
 
-    let result;
     try {
-      result = JSON.parse(responseText);
+      return JSON.parse(responseText);
     } catch (e) {
-      throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Body: ${responseText}`);
+      return { status: "error", message: "Invalid JSON response" };
     }
-
-    return result;
   },
 
   getWireless: async (): Promise<WirelessConfig> => {
-    return {
-      ssid: "MyWiFi",
-      password: "password123",
-      channel: "Auto",
-      encryption: "WPA2",
-      enabled: true,
-    };
+    const url = "http://192.168.1.1/cgi-bin/wireless.cgi?option=get";
+    console.log("getWireless Request:", { url });
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    console.log("getWireless Response:", {
+      url,
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    }
+
+    try {
+      const data = JSON.parse(responseText);
+      if (data.status === "success" && data.data) {
+        // Map encryption types if needed
+        const encryption = data.data.encryption;
+        
+        // Log the raw encryption value for debugging
+        console.log("Raw encryption value:", encryption);
+        
+        return {
+          ssid: data.data.ssid,
+          password: data.data.password,
+          encryption: encryption, // Use the raw value from backend
+          channel: data.data.channel,
+          enabled: data.data.enabled,
+        };
+      } else {
+        throw new Error(`Invalid response format: ${responseText}`);
+      }
+    } catch (e) {
+      throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Body: ${responseText}`);
+    }
   },
 
-  updateWireless: async (config: WirelessConfig): Promise<void> => {
-    console.log("Updating wireless config:", config);
+  updateWireless: async (config: WirelessConfig): Promise<{ status: string; message: string }> => {
+    const url = "http://192.168.1.1/cgi-bin/wireless.cgi";
+    console.log("updateWireless Request:", { url, config });
+
+    // Send the config as-is without mapping encryption types
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(config),
+    });
+
+    const responseText = await response.text();
+    console.log("updateWireless Response:", {
+      url,
+      status: response.status,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    }
+
+    try {
+      return JSON.parse(responseText);
+    } catch (e) {
+      return { status: "error", message: "Invalid JSON response" };
+    }
   },
 
   getDhcpDns: async (): Promise<DhcpDnsConfig> => {

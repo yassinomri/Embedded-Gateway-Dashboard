@@ -1,8 +1,8 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/network-api";
-import { Network as NetworkIcon, Wifi, Database, WifiOff } from "lucide-react";
+import { Network as NetworkIcon, Wifi, Database, WifiOff, Eye, EyeOff } from "lucide-react";
 import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -37,8 +37,18 @@ const isValidLastOctet = (octet: string): boolean => {
 };
 
 export default function Network() {
+  const queryClient = useQueryClient();
+
   // Add a state to track if the gateway is online
   const [isGatewayOnline, setIsGatewayOnline] = useState(true);
+
+  // Add state for password visibility
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Toggle password visibility
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
   // Query for interfaces
   const { data: networkData, isLoading: isLoadingInterfaces, error: interfacesError } = useQuery<NetworkData>({
@@ -128,11 +138,8 @@ export default function Network() {
     isLoadingDhcpDns, dhcpDnsError, dhcpDnsData,
   ]);
 
-  // State for editing eth0 IP and gateway
-  const [eth0Config, setEth0Config] = useState<{ address: string; gateway: string }>({
-    address: "",
-    gateway: "",
-  });
+  // State for editing interface gateway
+  const [interfaceConfig, setInterfaceConfig] = useState<{ [key: string]: { gateway: string } }>({});
 
   // State for wireless and DHCP & DNS
   const [wirelessConfig, setWirelessConfig] = useState<WirelessConfig>(
@@ -160,12 +167,12 @@ export default function Network() {
   );
   
 
-  // Mutation for updating eth0
+  // Mutation for updating interface
   const interfaceMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { address: string; gateway: string } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { gateway: string } }) => {
       try {
         // Try to update online
-        const response = await apiClient.updateInterface(id, { address: data.address, gateway: data.gateway, status: "up" });
+        const response = await apiClient.updateInterface(id, { gateway: data.gateway });
         setIsGatewayOnline(true);
         return response;
       } catch (error) {
@@ -173,7 +180,6 @@ export default function Network() {
         setIsGatewayOnline(false);
         savePendingConfig(`network.cgi?interface=${id}`, "POST", { 
           interface: id, 
-          ip: data.address, 
           gateway: data.gateway 
         });
         return { 
@@ -202,9 +208,9 @@ export default function Network() {
   const wirelessMutation = useMutation({
     mutationFn: async (config: WirelessConfig) => {
       try {
-        await apiClient.updateWireless(config);
+        const response = await apiClient.updateWireless(config);
         setIsGatewayOnline(true);
-        return { status: "success", message: "Wireless configuration updated successfully" };
+        return response;
       } catch (error) {
         setIsGatewayOnline(false);
         savePendingConfig("wireless.cgi", "POST", config);
@@ -219,6 +225,8 @@ export default function Network() {
         title: response.status === "success" ? "Success" : "Pending",
         description: response.message,
       });
+      // Invalidate the wireless query to refetch the data
+      queryClient.invalidateQueries({ queryKey: ["network", "wireless"] });
     },
     onError: (error) => {
       toast({
@@ -262,17 +270,29 @@ export default function Network() {
   
 
   // Validation functions
-  const validateInterface = (data: { address: string; gateway: string }) => {
-    return isValidIP(data.address) && (!data.gateway || isValidIP(data.gateway));
+  const validateInterface = (data: { gateway: string }) => {
+    return data.gateway && isValidIP(data.gateway);
   };
 
-  function validateWireless() {
-    return (
-      isValidSSID(wirelessConfig.ssid) &&
-      (wirelessConfig.encryption === "None" || isValidPassword(wirelessConfig.password)) &&
-      ["1", "6", "11", "Auto"].includes(wirelessConfig.channel)
-    );
-  }
+  const validateWireless = () => {
+    if (!isValidSSID(wirelessConfig.ssid)) {
+      return false;
+    }
+    
+    if (wirelessConfig.encryption !== "None" && !isValidPassword(wirelessConfig.password)) {
+      return false;
+    }
+    
+    return true;
+  };
+
+  const isValidSSID = (ssid: string) => {
+    return ssid.length > 0 && ssid.length <= 32;
+  };
+
+  const isValidPassword = (password: string) => {
+    return wirelessConfig.encryption === "None" || (password.length >= 8 && password.length <= 63);
+  };
 
   const validateDhcpDns = () => {
     const startOctet = parseInt(rangeStartLastOctet, 10);
@@ -367,6 +387,7 @@ export default function Network() {
   // Update state when query data changes
   useEffect(() => {
     if (wirelessData) {
+      console.log("Wireless data received:", wirelessData);
       setWirelessConfig(wirelessData);
     }
   }, [wirelessData]);
@@ -389,13 +410,11 @@ export default function Network() {
 
   useEffect(() => {
     if (networkData && networkData.interfaces) {
-      const eth0 = networkData.interfaces.find((iface) => iface.id === "eth0");
-      if (eth0) {
-        setEth0Config({
-          address: eth0.ipAddress,
-          gateway: eth0.gateway || "",
-        });
-      }
+      const newConfig = {};
+      networkData.interfaces.forEach((iface) => {
+        newConfig[iface.id] = { gateway: iface.gateway || "" };
+      });
+      setInterfaceConfig(newConfig);
     }
   }, [networkData]);
 
@@ -494,27 +513,15 @@ export default function Network() {
                   <form className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor={`status-${iface.id}`}>Status</Label>
-                      <Input id={`status-${iface.id}`} value={iface.status} disabled />
+                      <Input 
+                        id={`status-${iface.id}`} 
+                        value={iface.status} 
+                        disabled 
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor={`mac-${iface.id}`}>MAC Address</Label>
                       <Input id={`mac-${iface.id}`} value={iface.macAddress} disabled />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`address-${iface.id}`}>IPv4 Address</Label>
-                      <Input
-                        id={`address-${iface.id}`}
-                        value={iface.id === "eth0" ? eth0Config.address : iface.ipAddress}
-                        onChange={(e) => {
-                          if (iface.id === "eth0") {
-                            setEth0Config({ ...eth0Config, address: e.target.value });
-                          }
-                        }}
-                        disabled={iface.id !== "eth0"}
-                      />
-                      {iface.id === "eth0" && !isValidIP(eth0Config.address) && eth0Config.address && (
-                        <p className="text-red-500 text-xs">Invalid IP address</p>
-                      )}
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor={`netmask-${iface.id}`}>Netmask</Label>
@@ -522,35 +529,49 @@ export default function Network() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor={`gateway-${iface.id}`}>Gateway</Label>
-                      <Input
-                        id={`gateway-${iface.id}`}
-                        value={iface.id === "eth0" ? eth0Config.gateway : iface.gateway || ""}
-                        onChange={(e) => {
-                          if (iface.id === "eth0") {
-                            setEth0Config({ ...eth0Config, gateway: e.target.value });
-                          }
-                        }}
-                        disabled={iface.id !== "eth0"}
-                      />
-                      {iface.id === "eth0" && eth0Config.gateway && !isValidIP(eth0Config.gateway) && (
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-grow-0 flex-shrink-0">
+                          <Input 
+                            value="192.168." 
+                            disabled 
+                            className="w-24 bg-gray-100"
+                          />
+                        </div>
+                        <div className="flex-grow">
+                          <Input
+                            id={`gateway-${iface.id}`}
+                            value={interfaceConfig[iface.id]?.gateway.replace(/^192\.168\./, '') || ""}
+                            onChange={(e) => {
+                              const lastOctets = e.target.value;
+                              setInterfaceConfig({
+                                ...interfaceConfig,
+                                [iface.id]: { 
+                                  ...interfaceConfig[iface.id],
+                                  gateway: `192.168.${lastOctets}` 
+                                }
+                              });
+                            }}
+                            placeholder="1.1"
+                          />
+                        </div>
+                      </div>
+                      {interfaceConfig[iface.id]?.gateway && !isValidIP(interfaceConfig[iface.id].gateway) && (
                         <p className="text-red-500 text-xs">Invalid gateway</p>
                       )}
                     </div>
-                    {iface.id === "eth0" && (
-                      <Button
-                        type="button"
-                        className="custom-button"
-                        onClick={() =>
-                          interfaceMutation.mutate({
-                            id: iface.id,
-                            data: { address: eth0Config.address, gateway: eth0Config.gateway },
-                          })
-                        }
-                        disabled={!validateInterface(eth0Config) || interfaceMutation.isPending}
-                      >
-                        {interfaceMutation.isPending ? "Saving..." : "Save Interface"}
-                      </Button>
-                    )}
+                    <Button
+                      type="button"
+                      className="custom-button"
+                      onClick={() =>
+                        interfaceMutation.mutate({
+                          id: iface.id,
+                          data: { gateway: interfaceConfig[iface.id]?.gateway || "" },
+                        })
+                      }
+                      disabled={!validateInterface(interfaceConfig[iface.id] || { gateway: "" }) || interfaceMutation.isPending}
+                    >
+                      {interfaceMutation.isPending ? "Saving..." : "Save Gateway"}
+                    </Button>
                   </form>
                 </CardContent>
               </Card>
@@ -583,14 +604,25 @@ export default function Network() {
                   {/* Password */}
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="********"
-                      value={wirelessConfig.password}
-                      onChange={(e) => setWirelessConfig({ ...wirelessConfig, password: e.target.value })}
-                      disabled={wirelessConfig.encryption === "None"}
-                    />
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="********"
+                        value={wirelessConfig.password}
+                        onChange={(e) => setWirelessConfig({ ...wirelessConfig, password: e.target.value })}
+                        disabled={wirelessConfig.encryption === "None"}
+                      />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                        tabIndex={-1}
+                        disabled={wirelessConfig.encryption === "None"}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                     {wirelessConfig.encryption !== "None" &&
                       !isValidPassword(wirelessConfig.password) &&
                       wirelessConfig.password && (
@@ -628,9 +660,11 @@ export default function Network() {
                         <SelectValue placeholder="Select encryption" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="WPA2">WPA2</SelectItem>
-                        <SelectItem value="WPA3">WPA3</SelectItem>
-                        <SelectItem value="None">None</SelectItem>
+                        <SelectItem value="psk2">WPA2-PSK</SelectItem>
+                        <SelectItem value="psk">WPA-PSK</SelectItem>
+                        <SelectItem value="wpa2">WPA2</SelectItem>
+                        <SelectItem value="wpa3">WPA3</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -824,6 +858,27 @@ export default function Network() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
