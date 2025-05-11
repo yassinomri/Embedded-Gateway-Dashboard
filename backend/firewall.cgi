@@ -116,7 +116,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
                     [ "$ENABLED_RULE" = "true" ] && uci set "firewall.$NEW_RULE.enabled=1" 2>/dev/null
                     [ "$ENABLED_RULE" = "false" ] && uci set "firewall.$NEW_RULE.enabled=0" 2>/dev/null
                 fi
-            else
+            elif [ "$ACTION" = "update" ]; then
                 # Update existing rule
                 ID=$(echo "$rule" | sed -n 's/.*"id"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
                 NAME=$(echo "$rule" | sed -n 's/.*"name"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
@@ -127,15 +127,24 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
                 ENABLED_RULE=$(echo "$rule" | sed -n 's/.*"enabled"[ ]*:[ ]*\([^,}\ ]*\).*/\1/p')
 
                 if [ -n "$ID" ]; then
-                    [ -n "$NAME" ] && uci set "$ID.name=$NAME" 2>/dev/null
-                    [ -n "$SRC" ] && uci set "$ID.src=$SRC" 2>/dev/null
-                    [ -n "$DEST" ] && uci set "$ID.dest=$DEST" 2>/dev/null
-                    [ -n "$PROTO" ] && uci set "$ID.proto=$PROTO" 2>/dev/null
-                    [ -n "$TARGET" ] && uci set "$ID.target=$TARGET" 2>/dev/null
-                    if [ "$ENABLED_RULE" = "true" ] || [ "$ENABLED_RULE" = "false" ]; then
-                        [ "$ENABLED_RULE" = "true" ] && UCI_ENABLED_RULE="1" || UCI_ENABLED_RULE="0"
-                        uci set "$ID.enabled=$UCI_ENABLED_RULE" 2>/dev/null
+                    INDEX=$(echo "$ID" | sed 's/rule-//')
+                    if uci get firewall.@rule[$INDEX] >/dev/null 2>&1; then
+                        echo "$(date): Updating rule $ID" >> /tmp/firewall_cgi.log
+                        [ -n "$NAME" ] && uci set "firewall.@rule[$INDEX].name=$NAME" 2>/dev/null
+                        [ -n "$SRC" ] && uci set "firewall.@rule[$INDEX].src=$SRC" 2>/dev/null
+                        [ -n "$DEST" ] && uci set "firewall.@rule[$INDEX].dest=$DEST" 2>/dev/null
+                        [ -n "$PROTO" ] && uci set "firewall.@rule[$INDEX].proto=$PROTO" 2>/dev/null
+                        [ -n "$TARGET" ] && uci set "firewall.@rule[$INDEX].target=$TARGET" 2>/dev/null
+                        if [ "$ENABLED_RULE" = "true" ] || [ "$ENABLED_RULE" = "false" ]; then
+                            [ "$ENABLED_RULE" = "true" ] && UCI_ENABLED_RULE="1" || UCI_ENABLED_RULE="0"
+                            uci set "firewall.@rule[$INDEX].enabled=$UCI_ENABLED_RULE" 2>/dev/null
+                        fi
+                        echo "$(date): Rule $ID updated successfully" >> /tmp/firewall_cgi.log
+                    else
+                        echo "$(date): ERROR: Rule $ID not found for update" >> /tmp/firewall_cgi.log
                     fi
+                else
+                    echo "$(date): ERROR: Missing ID for update" >> /tmp/firewall_cgi.log
                 fi
             fi
         done
@@ -143,7 +152,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         /etc/init.d/firewall reload 2>/dev/null
     fi
 
-    RESPONSE="{\"status\": \"success\", \"message\": \"$([ "$ACTION" = "add" ] && echo "Rule added" || echo "Firewall updated")\"}"
+    RESPONSE="{\"status\": \"success\", \"message\": \"$([ "$ACTION" = "add" ] && echo "Rule added" || [ "$ACTION" = "update" ] && echo "Rule updated" || echo "Firewall updated")\"}"
     echo "$RESPONSE"
     echo "$(date): POST response sent: $RESPONSE" >> /tmp/firewall_cgi.log
     exit 0
