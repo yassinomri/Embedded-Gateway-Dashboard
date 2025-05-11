@@ -15,6 +15,7 @@ export interface WirelessConfig {
   channel: string;
   encryption: string;
   enabled: boolean;
+  band: string;
 }
 
 export interface DhcpDnsConfig {

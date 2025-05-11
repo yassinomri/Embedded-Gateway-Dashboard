@@ -142,15 +142,33 @@ export default function Network() {
   const [interfaceConfig, setInterfaceConfig] = useState<{ [key: string]: { gateway: string } }>({});
 
   // State for wireless and DHCP & DNS
-  const [wirelessConfig, setWirelessConfig] = useState<WirelessConfig>(
+  const [wirelessConfig, setWirelessConfig] = useState<WirelessConfig & { band?: string }>(
     wirelessData || {
       ssid: '',
       password: '',
       channel: 'Auto',
       encryption: 'WPA2',
       enabled: false,
+      band: '2.4g', // Default to 2.4GHz
     }
   );
+
+      // Update channel when band changes
+  useEffect(() => {
+    if (wirelessConfig.band === '5g' && 
+        !['Auto', '36', '40', '44', '48'].includes(wirelessConfig.channel)) {
+      setWirelessConfig({
+        ...wirelessConfig,
+        channel: 'Auto'
+      });
+    } else if (wirelessConfig.band === '2.4g' && 
+              !['Auto', '1', '6', '11'].includes(wirelessConfig.channel)) {
+      setWirelessConfig({
+        ...wirelessConfig,
+        channel: 'Auto'
+      });
+    }
+  }, [wirelessConfig, wirelessConfig.band]);
 
   const [dhcpDnsConfig, setDhcpDnsConfig] = useState<DhcpDnsConfig>(
     dhcpDnsData || {
@@ -388,7 +406,10 @@ export default function Network() {
   useEffect(() => {
     if (wirelessData) {
       console.log("Wireless data received:", wirelessData);
-      setWirelessConfig(wirelessData);
+      setWirelessConfig({
+        ...wirelessData,
+        band: wirelessData.band || '2.4g' // Ensure band is properly set from backend data
+      });
     }
   }, [wirelessData]);
 
@@ -470,6 +491,31 @@ export default function Network() {
       </div>
     );
   }
+
+
+
+  // Function to get channel options based on band
+  const getChannelOptions = (band: string) => {
+    if (band === '5g') {
+      return [
+        { value: 'Auto', label: 'Auto Channel' },
+        { value: '36', label: '36' },
+        { value: '40', label: '40' },
+        { value: '44', label: '44' },
+        { value: '48', label: '48' },
+      ];
+    } else {
+      // Default to 2.4GHz
+      return [
+        { value: 'Auto', label: 'Auto Channel' },
+        { value: '1', label: '1' },
+        { value: '6', label: '6 (Recommended)' },
+        { value: '11', label: '11' },
+      ];
+    }
+  };
+
+
 
   return (
     <div className="container mx-auto p-6">
@@ -630,6 +676,23 @@ export default function Network() {
                       )}
                   </div>
 
+                  {/* Band */}
+                  <div className="space-y-2">
+                    <Label htmlFor="band">Frequency Band</Label>
+                    <Select
+                      value={wirelessConfig.band || '2.4g'}
+                      onValueChange={(value) => setWirelessConfig({ ...wirelessConfig, band: value })}
+                    >
+                      <SelectTrigger id="band">
+                        <SelectValue placeholder="Select band" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2.4g">2.4 GHz</SelectItem>
+                        <SelectItem value="5g">5 GHz</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   {/* Channel */}
                   <div className="space-y-2">
                     <Label htmlFor="channel">Channel</Label>
@@ -641,10 +704,9 @@ export default function Network() {
                         <SelectValue placeholder="Select channel" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Auto">Auto</SelectItem>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="6">6</SelectItem>
-                        <SelectItem value="11">11</SelectItem>
+                        {getChannelOptions(wirelessConfig.band || '2.4g').map(option => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -858,6 +920,12 @@ export default function Network() {
     </div>
   );
 }
+
+
+
+
+
+
 
 
 

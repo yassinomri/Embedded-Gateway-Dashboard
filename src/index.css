@@ -1,3 +1,4 @@
+/* tailwindcss directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -98,4 +99,14 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Add this to your CSS file */
+[data-radix-popper-content-wrapper] {
+  background-color: hsl(var(--background)) !important;
+}
+
+.select-content {
+  background-color: hsl(var(--background)) !important;
+  backdrop-filter: none !important;
 }

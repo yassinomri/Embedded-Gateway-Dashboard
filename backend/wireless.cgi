@@ -48,8 +48,9 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     ENCRYPTION=$(uci get wireless.@wifi-iface[0].encryption 2>/dev/null || echo "None")
     CHANNEL=$(uci get wireless.radio0.channel 2>/dev/null || echo "Auto")
     DISABLED=$(uci get wireless.@wifi-iface[0].disabled 2>/dev/null || echo "0")
+    BAND=$(uci get wireless.radio0.band 2>/dev/null || echo "2.4g")
 
-    echo "$(date): Raw values: SSID=$SSID, ENCRYPTION=$ENCRYPTION, CHANNEL=$CHANNEL, DISABLED=$DISABLED" >> $LOG_FILE
+    echo "$(date): Raw values: SSID=$SSID, ENCRYPTION=$ENCRYPTION, CHANNEL=$CHANNEL, DISABLED=$DISABLED, BAND=$BAND" >> $LOG_FILE
 
     # Convert disabled flag to enabled boolean (0=enabled, 1=disabled)
     if [ "$DISABLED" = "1" ]; then
@@ -68,7 +69,8 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     \"password\": \"$PASSWORD\",
     \"encryption\": \"$ENCRYPTION\",
     \"channel\": \"$CHANNEL\",
-    \"enabled\": $ENABLED
+    \"enabled\": $ENABLED,
+    \"band\": \"$BAND\"
   }
 }"
     echo "$(date): Sending response: $RESPONSE" >> $LOG_FILE
@@ -134,5 +136,6 @@ fi
 echo "$(date): Unsupported method: $REQUEST_METHOD" >> $LOG_FILE
 echo "{\"status\": \"error\", \"message\": \"Unsupported request method: $REQUEST_METHOD\"}"
 exit 1
+
 
 

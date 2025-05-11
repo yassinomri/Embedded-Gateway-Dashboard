@@ -126,6 +126,7 @@ export const apiClient = {
           encryption: encryption, // Use the raw value from backend
           channel: data.data.channel,
           enabled: data.data.enabled,
+          band: data.data.band,
         };
       } else {
         throw new Error(`Invalid response format: ${responseText}`);
