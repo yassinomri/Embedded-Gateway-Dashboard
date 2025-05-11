@@ -378,64 +378,106 @@ const handleToggleFirewall = async () => {
                 <Plus size={24} color="#00f6ff" />
                 Add New Rule
               </h2>
+              <button 
+                type="button" 
+                className="modal-close-button" 
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Close"
+              >
+                ×
+              </button>
             </header>
             <form onSubmit={handleAddRule} className="modal-form">
-              <div className="form-group">
-                <label htmlFor="name">Rule Name</label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={newRule.name}
-                  onChange={handleInputChange}
-                  placeholder="Enter rule name"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="src">Source</label>
-                <select id="src" name="src" value={newRule.src} onChange={handleInputChange}>
-                  <option value="any">Any</option>
-                  <option value="lan">LAN</option>
-                  <option value="wan">WAN</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="dest">Destination</label>
-                <select id="dest" name="dest" value={newRule.dest} onChange={handleInputChange}>
-                  <option value="any">Any</option>
-                  <option value="lan">LAN</option>
-                  <option value="wan">WAN</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="proto">Protocol</label>
-                <select id="proto" name="proto" value={newRule.proto} onChange={handleInputChange}>
-                  <option value="tcp">TCP</option>
-                  <option value="udp">UDP</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="target">Action</label>
-                <select id="target" name="target" value={newRule.target} onChange={handleInputChange}>
-                  <option value="ACCEPT">Accept</option>
-                  <option value="DROP">Drop</option>
-                  <option value="REJECT">Reject</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <div className="checkbox-group">
+              <div className="form-grid">
+                <div className="form-group">
+                  <label htmlFor="name">Rule Name</label>
                   <input
-                    type="checkbox"
-                    id="enabled"
-                    name="enabled"
-                    checked={newRule.enabled ?? true}
+                    type="text"
+                    id="name"
+                    name="name"
+                    value={newRule.name}
                     onChange={handleInputChange}
+                    placeholder="Enter rule name"
+                    required
+                    className="enhanced-input"
                   />
-                  <label htmlFor="enabled">Enabled</label>
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="src">Source</label>
+                  <select 
+                    id="src" 
+                    name="src" 
+                    value={newRule.src} 
+                    onChange={handleInputChange}
+                    className="enhanced-select"
+                  >
+                    <option value="any">Any</option>
+                    <option value="lan">LAN</option>
+                    <option value="wan">WAN</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="dest">Destination</label>
+                  <select 
+                    id="dest" 
+                    name="dest" 
+                    value={newRule.dest} 
+                    onChange={handleInputChange}
+                    className="enhanced-select"
+                  >
+                    <option value="any">Any</option>
+                    <option value="lan">LAN</option>
+                    <option value="wan">WAN</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="proto">Protocol</label>
+                  <select 
+                    id="proto" 
+                    name="proto" 
+                    value={newRule.proto} 
+                    onChange={handleInputChange}
+                    className="enhanced-select"
+                  >
+                    <option value="tcp">TCP</option>
+                    <option value="udp">UDP</option>
+                    <option value="all">All</option>
+                  </select>
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="target">Action</label>
+                  <select 
+                    id="target" 
+                    name="target" 
+                    value={newRule.target} 
+                    onChange={handleInputChange}
+                    className="enhanced-select"
+                  >
+                    <option value="ACCEPT">Accept</option>
+                    <option value="DROP">Drop</option>
+                    <option value="REJECT">Reject</option>
+                  </select>
+                </div>
+                
+                <div className="form-group checkbox-container">
+                  <div className="enhanced-checkbox-group">
+                    <input
+                      type="checkbox"
+                      id="enabled"
+                      name="enabled"
+                      checked={newRule.enabled ?? true}
+                      onChange={handleInputChange}
+                      className="enhanced-checkbox"
+                    />
+                    <label htmlFor="enabled" className="checkbox-label">Enabled</label>
+                  </div>
                 </div>
               </div>
+              
               <footer className="modal-footer">
                 <button
                   type="button"
