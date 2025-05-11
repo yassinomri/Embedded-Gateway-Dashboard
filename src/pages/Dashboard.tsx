@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useMemo, Suspense } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button"; // Assuming you have a Button component
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
 import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
+import { PowerIcon, WifiOff } from "lucide-react";
+import { SyncManager } from "@/components/SyncManager";
 
 // Function to format memory values
 const formatMemory = (value: number): string => {
@@ -59,7 +61,6 @@ import {
   PointElement,
   LineElement,
 } from "chart.js";
-import { cpuUsage } from "process";
 
 // Register Chart.js components
 ChartJS.register(
@@ -80,18 +81,21 @@ const Dashboard: React.FC = () => {
   const [bandwidthHistory, setBandwidthHistory] = useState<
     { time: string; uploadRate: number; downloadRate: number }[]
   >([]);
+  const [systemOnline, setSystemOnline] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await apiClient.getDashboardData();
         setDashboardData(response);
-        localStorage.setItem("dashboardData", JSON.stringify(response));
+        setSystemOnline(true);
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError("Failed to fetch dashboard data.");
+        setSystemOnline(false);
+        // No longer loading from cache
       } finally {
-        setLoading(false); // Ensure loading is set to false
+        setLoading(false);
       }
     };
 
@@ -165,15 +169,36 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     const fetchBandwidthHistory = async () => {
       const data = await getBandwidthData(50); // Fetch the last 50 entries
-      setBandwidthHistory(data);
+      setBandwidthHistory(
+        data.map(entry => ({
+          time: new Date(new Date(entry.time).getTime() + 60 * 60 * 1000).toLocaleTimeString(), // Add 1 hour
+          uploadRate: entry.uploadRate,
+          downloadRate: entry.downloadRate,
+        }))
+      );
     };
 
     fetchBandwidthHistory();
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      const data = await getBandwidthData(50);
+      setBandwidthHistory(
+        data.map(entry => ({
+          time: new Date(new Date(entry.time).getTime() + 60 * 60 * 1000).toLocaleTimeString(), // Add 1 hour
+          uploadRate: entry.uploadRate,
+          downloadRate: entry.downloadRate,
+        }))
+      );
+    }, 5000); // Update every 5 seconds
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, []);
+
+
   const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
   const errorContent = error ? <p className="text-red-500">{error}</p> : null;
-  const noDataContent = !dashboardData ? <p>No data available.</p> : null;
 
   // Parse memory info
   const memoryInfo = useMemo(() => {
@@ -205,7 +230,6 @@ const Dashboard: React.FC = () => {
     try {
       const topInfoString = dashboardData.loadaverageInfo.toString();
       
-      // Look for the CPU line in BusyBox top format (matches the actual data)
       // Expected format: "CPU:   0% usr   0% sys   0% nic 100% idle   0% io   0% irq   0% sirq"
       const cpuLine = topInfoString
         .split("\n")
@@ -380,7 +404,7 @@ const Dashboard: React.FC = () => {
   const networkInterfaces = useMemo(() => {
     if (!dashboardData?.networkInfo) return [];
 
-    return dashboardData.networkInfo.map((interfaceData: NetworkInterface) => ({
+    return Array.isArray(dashboardData.networkInfo) ? dashboardData.networkInfo.map((interfaceData: NetworkInterface) => ({
       name: interfaceData.interface || "N/A",
       mac: interfaceData.hwaddr || "N/A",
       ipv4: interfaceData.inet || "N/A",
@@ -390,314 +414,336 @@ const Dashboard: React.FC = () => {
       rxPackets: formatBytes(interfaceData.rx_packets) || "0",
       txPackets: formatBytes(interfaceData.tx_packets) || "0",
       mtu: interfaceData.mtu || "N/A",
-    }));
+    })) : [];
   }, [dashboardData?.networkInfo]);
 
-  const historicalChartData = useMemo(() => {
-    if (historicalData.length === 0) return null;
-  
-    return {
-      labels: historicalData.map(entry => entry.time), // Time labels
-      datasets: [
-        {
-          label: "Total Bandwidth (Mbps)",
-          data: historicalData.map(entry => entry.throughput),
-          borderColor: "#36A2EB",
-          backgroundColor: "rgba(54, 162, 235, 0.2)",
-          fill: true,
-        },
-      ],
-    };
-  }, [historicalData]);
 
   if (loading) return loadingContent;
-  if (error) return errorContent;
-  if (!dashboardData) return noDataContent;
-
+  // Remove the error check that was showing the generic error message
+  
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {/* System Status */}
-        <Card className="col-span-2"> {/* Adjust grid span to give more space */}
-          <CardHeader>
-            <CardTitle>System Status</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between items-center">
-              {/* Memory Usage Chart */}
-              <div className="w-1/2">
-                <Suspense fallback={<div className="h-32 flex items-center justify-center">
-                  <p>Loading Memory chart...</p>
-                </div>}>
-                  <Doughnut 
-                    data={memoryChartData} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: true,
-                      plugins: {
-                        legend: {
-                          display: true,
-                          position: 'bottom',
-                          labels: {
-                            boxWidth: 12,
-                            padding: 8
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </Suspense>
-                <p className="text-center text-sm mt-2">Memory Usage %</p>
-              </div>
+      <SyncManager />
+      
+      {/* System Status Header - Always visible */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-2">
+          <h1 className="text-2xl font-bold">Gateway Status</h1>
+          <PowerIcon 
+            size={24} 
+            className={systemOnline ? "text-green-500" : "text-red-500"} 
+            fill={systemOnline ? "currentColor" : "none"}
+          />
+        </div>
+      </div>
 
-              {/* CPU Usage Chart */}
-              <div className="w-1/2">
-                <Suspense fallback={<div className="h-32 flex items-center justify-center">
-                  <p>Loading CPU chart...</p>
-                </div>}>
-                  <Doughnut 
-                    data={cpuChartData} 
-                    options={{
-                      responsive: true,
-                      maintainAspectRatio: true,
-                      plugins: {
-                        legend: {
-                          display: true,
-                          position: 'bottom',
-                          labels: {
-                            boxWidth: 12,
-                            padding: 8
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </Suspense>
-                <p className="text-center text-sm mt-2">CPU Usage %</p>
-              </div>
+      {/* Show offline message when system is offline */}
+      {!systemOnline ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-gray-50 rounded-lg border border-gray-200 shadow-sm">
+          <div className="mb-6">
+            {/* Placeholder for offline image */}
+            <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+              <WifiOff size={48} className="text-gray-400" />
             </div>
-
-            {/* Additional System Info */}
-            <div className="mt-8 space-y-2">
-              <p>
-                <span className="text-base font-normal">Total Memory:</span>
-                <span className="text-lg ml-2 font-medium">{formatMemory(totalMemory)}</span>
-              </p>
-              <p>
-                <span className="text-base font-normal">Free Memory:</span>
-                <span className="text-lg ml-2 font-medium">{formatMemory(freeMemory)}</span>
-              </p>
-              <p>
-                <span className="text-base font-normal">Used Memory:</span>
-                <span className="text-lg ml-2 font-medium">{formatMemory(usedMemory)}</span>
-              </p>
-              <p>
-                <span className="text-base font-normal">CPU Usage:</span>
-                <span className="text-lg ml-2 font-medium">{cpuUsageData.usage}%</span>
-              </p>
-              <p>
-                <span className="text-base font-normal">Load Average:</span>
-                <span className="text-lg ml-2 font-medium">{loadAverage}</span>
-              </p>
-            </div>
-
-          </CardContent>
-        </Card>
-
-        {/* Firewall Status */}
-        <Card className="col-span-2"> {/* Adjust grid span to give more space */}
-          <CardHeader>
-            <CardTitle>Firewall</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Status Badge */}
+          </div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Gateway is currently offline</h2>
+          <p className="text-gray-500 text-center max-w-md mb-6">
+            The gateway appears to be powered off or unreachable. Any configuration changes you make will be saved and applied when the gateway comes back online.
+          </p>
+        </div>
+      ) : (
+        /* Regular dashboard content when online */
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* System Status */}
+          <Card className="col-span-2">
+            <CardHeader>
               <div className="flex items-center space-x-2">
-                <span className="text-xl">🔥</span>
-                <span className="text-lg font-bold">Status: </span>
-                <span
-                  className={`px-2 py-1 text-white text-sm rounded ${
-                    dashboardData?.firewallStatus?.status ? "bg-green-500" : "bg-red-500"
-                  }`}
-                >
-                  {dashboardData?.firewallStatus?.status ? "Active" : "Inactive"}
-                </span>
+                <CardTitle>System Status</CardTitle>
               </div>
-
-              {/* Summary Info */}
-              <ul className="list-disc pl-5 space-y-1">
-                <li>
-                  <strong>{dashboardData?.firewallStatus?.rules?.activeRules || 0}</strong> Active Rules
-                </li>
-                <li>
-                  <strong>{dashboardData?.firewallStatus?.rules?.totalRules || 0}</strong> Total Rules
-                </li>
-              </ul>
-
-              {/* Go to Firewall Page Button */}
-              <div className="mt-4">
-                <Button
-                  onClick={() => {
-                    window.location.href = "/firewall";
-                  }}
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  Go to Firewall Page
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bandwidth Usage */}
-        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
-          <CardHeader>
-            <CardTitle>Bandwidth Usage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Bandwidth Rates */}
+              <CardDescription></CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="flex justify-between items-center">
-                <div>
-                  <p>
-                    <strong>Upload Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.txRate || "0")}
-                  </p>
-                  <p>
-                    <strong>Download Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.rxRate || "0")}
-                  </p>
+                {/* Memory Usage Chart */}
+                <div className="w-1/2">
+                  <Suspense fallback={<div className="h-32 flex items-center justify-center">
+                    <p>Loading Memory chart...</p>
+                  </div>}>
+                    <Doughnut 
+                      data={memoryChartData} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                          legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                              boxWidth: 12,
+                              padding: 8
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Suspense>
+                  <p className="text-center text-sm mt-2">Memory Usage %</p>
+                </div>
+
+                {/* CPU Usage Chart */}
+                <div className="w-1/2">
+                  <Suspense fallback={<div className="h-32 flex items-center justify-center">
+                    <p>Loading CPU chart...</p>
+                  </div>}>
+                    <Doughnut 
+                      data={cpuChartData} 
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                          legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                              boxWidth: 12,
+                              padding: 8
+                            }
+                          }
+                        }
+                      }}
+                    />
+                  </Suspense>
+                  <p className="text-center text-sm mt-2">CPU Usage %</p>
                 </div>
               </div>
 
-              {/* Bandwidth Chart */}
-              <Suspense fallback={<p>Loading chart...</p>}>
-                {bandwidthChartData && <Line data={bandwidthChartData} />}
-              </Suspense>
-            </div>
-          </CardContent>
-        </Card>
+              {/* Additional System Info */}
+              <div className="mt-8 space-y-2">
+                <p>
+                  <span className="text-base font-normal">Total Memory:</span>
+                  <span className="text-lg ml-2 font-medium">{formatMemory(totalMemory)}</span>
+                </p>
+                <p>
+                  <span className="text-base font-normal">Free Memory:</span>
+                  <span className="text-lg ml-2 font-medium">{formatMemory(freeMemory)}</span>
+                </p>
+                <p>
+                  <span className="text-base font-normal">Used Memory:</span>
+                  <span className="text-lg ml-2 font-medium">{formatMemory(usedMemory)}</span>
+                </p>
+                <p>
+                  <span className="text-base font-normal">CPU Usage:</span>
+                  <span className="text-lg ml-2 font-medium">{cpuUsageData.usage}%</span>
+                </p>
+                <p>
+                  <span className="text-base font-normal">Load Average:</span>
+                  <span className="text-lg ml-2 font-medium">{loadAverage}</span>
+                </p>
+              </div>
+
+            </CardContent>
+          </Card>
+
+          {/* Firewall Status */}
+          <Card className="col-span-2"> {/* Adjust grid span to give more space */}
+            <CardHeader>
+              <CardTitle>Firewall</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Status Badge */}
+                <div className="flex items-center space-x-2">
+                  <span className="text-xl">🔥</span>
+                  <span className="text-lg font-bold">Status: </span>
+                  <span
+                    className={`px-2 py-1 text-white text-sm rounded ${
+                      dashboardData?.firewallStatus?.status ? "bg-green-500" : "bg-red-500"
+                    }`}
+                  >
+                    {dashboardData?.firewallStatus?.status ? "Active" : "Inactive"}
+                  </span>
+                </div>
+
+                {/* Summary Info */}
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>
+                    <strong>{dashboardData?.firewallStatus?.activeRules || 0}</strong> Active Rules
+                  </li>
+                  <li>
+                    <strong>{dashboardData?.firewallStatus?.totalRules || 0}</strong> Total Rules
+                  </li>
+                </ul>
+
+                {/* Go to Firewall Page Button */}
+                <div className="mt-4">
+                  <Button
+                    onClick={() => {
+                      window.location.href = "/firewall";
+                    }}
+                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+                  >
+                    Go to Firewall Page
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Bandwidth Usage */}
+          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+            <CardHeader>
+              <CardTitle>Bandwidth Usage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Bandwidth Rates */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p>
+                      <strong>Upload Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.txRate || "0")}
+                    </p>
+                    <p>
+                      <strong>Download Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.rxRate || "0")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Bandwidth Chart */}
+                <Suspense fallback={<p>Loading chart...</p>}>
+                  {bandwidthChartData && <Line data={bandwidthChartData} />}
+                </Suspense>
+              </div>
+            </CardContent>
+          </Card>
 
 
 
                 {/* Network Interfaces Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Network Interfaces</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {networkInterfaces.length > 0 ? (
-              <div className="overflow-y-auto max-h-96">
-                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
-                  <thead className="bg-gray-100">
+          <Card>
+            <CardHeader>
+              <CardTitle>Network Interfaces</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {networkInterfaces.length > 0 ? (
+                <div className="overflow-y-auto max-h-96">
+                  <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 border border-gray-300">Interface</th>
+                        <th className="px-4 py-2 border border-gray-300">MAC Address</th>
+                        <th className="px-4 py-2 border border-gray-300">IPv4</th>
+                        <th className="px-4 py-2 border border-gray-300">IPv6</th>
+                        <th className="px-4 py-2 border border-gray-300">RX Bytes</th>
+                        <th className="px-4 py-2 border border-gray-300">TX Bytes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {networkInterfaces.map((iface, index) => (
+                        <tr
+                          key={index}
+                          className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        >
+                          <td className="px-4 py-2 border border-gray-300">{iface.name}</td>
+                          <td className="px-4 py-2 border border-gray-300">{iface.mac}</td>
+                          <td className="px-4 py-2 border border-gray-300">{iface.ipv4}</td>
+                          <td className="px-4 py-2 border border-gray-300">{iface.ipv6}</td>
+                          <td className="px-4 py-2 border border-gray-300">{iface.rxBytes}</td>
+                          <td className="px-4 py-2 border border-gray-300">{iface.txBytes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p>No network interfaces found.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Connected Devices */}
+          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+            <CardHeader>
+              <CardTitle>Connected Devices</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {connectedDevices && connectedDevices.length > 0 ? (
+                <table className="table-auto w-full text-sm">
+                  <thead>
                     <tr>
-                      <th className="px-4 py-2 border border-gray-300">Interface</th>
-                      <th className="px-4 py-2 border border-gray-300">MAC Address</th>
-                      <th className="px-4 py-2 border border-gray-300">IPv4</th>
-                      <th className="px-4 py-2 border border-gray-300">IPv6</th>
-                      <th className="px-4 py-2 border border-gray-300">RX Bytes</th>
-                      <th className="px-4 py-2 border border-gray-300">TX Bytes</th>
+                      <th className="px-4 py-2 text-left">IP Address</th>
+                      <th className="px-4 py-2 text-left">MAC Address</th>
+                      <th className="px-4 py-2 text-left">Hostname</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {networkInterfaces.map((iface, index) => (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                      >
-                        <td className="px-4 py-2 border border-gray-300">{iface.name}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.mac}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.ipv4}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.ipv6}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.rxBytes}</td>
-                        <td className="px-4 py-2 border border-gray-300">{iface.txBytes}</td>
+                    {connectedDevices.map((device, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="px-4 py-2">{device.ip}</td>
+                        <td className="px-4 py-2">{device.mac}</td>
+                        <td className="px-4 py-2">{device.hostname || "N/A"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              </div>
-            ) : (
-              <p>No network interfaces found.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Connected Devices */}
-        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
-          <CardHeader>
-            <CardTitle>Connected Devices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {connectedDevices && connectedDevices.length > 0 ? (
-              <table className="table-auto w-full text-sm">
-                <thead>
-                  <tr>
-                    <th className="px-4 py-2 text-left">IP Address</th>
-                    <th className="px-4 py-2 text-left">MAC Address</th>
-                    <th className="px-4 py-2 text-left">Hostname</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {connectedDevices.map((device, index) => (
-                    <tr key={index} className="border-t">
-                      <td className="px-4 py-2">{device.ip}</td>
-                      <td className="px-4 py-2">{device.mac}</td>
-                      <td className="px-4 py-2">{device.hostname || "N/A"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p>No connected devices found.</p>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <p>No connected devices found.</p>
+              )}
+            </CardContent>
+          </Card>
 
 
 
-        {/* Active Connections */}
-        <Card className="col-span-4"> {/* Adjust grid span to give more space */}
-          <CardHeader>
-            <CardTitle>Active Connections</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {activeConnections.length > 0 ? (
-              <div className="overflow-y-auto max-h-96"> {/* Make the table scrollable */}
-                <table className="table-auto w-full text-sm border-collapse border border-gray-300">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-4 py-2 text-left border border-gray-300">Protocol</th>
-                      <th className="px-4 py-2 text-left border border-gray-300">Recv-Q</th>
-                      <th className="px-4 py-2 text-left border border-gray-300">Send-Q</th>
-                      <th className="px-4 py-2 text-left border border-gray-300">Local Address</th>
-                      <th className="px-4 py-2 text-left border border-gray-300">Foreign Address</th>
-                      <th className="px-4 py-2 text-left border border-gray-300">State</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {activeConnections.map((connection, index) => (
-                      <tr
-                        key={index}
-                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} // Alternating row colors
-                      >
-                        <td className="px-4 py-2 border border-gray-300">{connection.protocol}</td>
-                        <td className="px-4 py-2 border border-gray-300">{connection.recvQ}</td>
-                        <td className="px-4 py-2 border border-gray-300">{connection.sendQ}</td>
-                        <td className="px-4 py-2 border border-gray-300">{connection.localAddress}</td>
-                        <td className="px-4 py-2 border border-gray-300">{connection.foreignAddress}</td>
-                        <td className="px-4 py-2 border border-gray-300">{connection.state}</td>
+          {/* Active Connections */}
+          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+            <CardHeader>
+              <CardTitle>Active Connections</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activeConnections.length > 0 ? (
+                <div className="overflow-y-auto max-h-96"> {/* Make the table scrollable */}
+                  <table className="table-auto w-full text-sm border-collapse border border-gray-300">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 text-left border border-gray-300">Protocol</th>
+                        <th className="px-4 py-2 text-left border border-gray-300">Recv-Q</th>
+                        <th className="px-4 py-2 text-left border border-gray-300">Send-Q</th>
+                        <th className="px-4 py-2 text-left border border-gray-300">Local Address</th>
+                        <th className="px-4 py-2 text-left border border-gray-300">Foreign Address</th>
+                        <th className="px-4 py-2 text-left border border-gray-300">State</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <p>No active connections found.</p>
-            )}
-          </CardContent>
-        </Card>
+                    </thead>
+                    <tbody>
+                      {activeConnections.map((connection, index) => (
+                        <tr
+                          key={index}
+                          className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} // Alternating row colors
+                        >
+                          <td className="px-4 py-2 border border-gray-300">{connection.protocol}</td>
+                          <td className="px-4 py-2 border border-gray-300">{connection.recvQ}</td>
+                          <td className="px-4 py-2 border border-gray-300">{connection.sendQ}</td>
+                          <td className="px-4 py-2 border border-gray-300">{connection.localAddress}</td>
+                          <td className="px-4 py-2 border border-gray-300">{connection.foreignAddress}</td>
+                          <td className="px-4 py-2 border border-gray-300">{connection.state}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p>No active connections found.</p>
+              )}
+            </CardContent>
+          </Card>
 
-      </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default Dashboard;
+
+
+
+
+

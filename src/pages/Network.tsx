@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/network-api";
-import { Network as NetworkIcon, Wifi, Database } from "lucide-react";
+import { Network as NetworkIcon, Wifi, Database, WifiOff } from "lucide-react";
 import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import "@/styles/Network.css";
+import { savePendingConfig } from "@/lib/offline-config";
 
 // Utility functions
 function isValidIP(ip: string) {
@@ -36,22 +37,76 @@ const isValidLastOctet = (octet: string): boolean => {
 };
 
 export default function Network() {
+  // Add a state to track if the gateway is online
+  const [isGatewayOnline, setIsGatewayOnline] = useState(true);
+
   // Query for interfaces
   const { data: networkData, isLoading: isLoadingInterfaces, error: interfacesError } = useQuery<NetworkData>({
     queryKey: ["network", "interfaces"],
-    queryFn: () => apiClient.getInterfaces(),
+    queryFn: async () => {
+      try {
+        const data = await apiClient.getInterfaces();
+        setIsGatewayOnline(true);
+        // Cache the data for offline use
+        localStorage.setItem("networkInterfaces", JSON.stringify(data));
+        return data;
+      } catch (error) {
+        setIsGatewayOnline(false);
+        // Try to load from cache
+        const cachedData = localStorage.getItem("networkInterfaces");
+        if (cachedData) {
+          return JSON.parse(cachedData);
+        }
+        throw error;
+      }
+    },
+    // Don't retry too aggressively when offline
+    retry: 1,
+    retryDelay: 3000,
   });
 
   // Query for wireless
   const { data: wirelessData, isLoading: isLoadingWireless, error: wirelessError } = useQuery<WirelessConfig>({
     queryKey: ["network", "wireless"],
-    queryFn: () => apiClient.getWireless(),
+    queryFn: async () => {
+      try {
+        const data = await apiClient.getWireless();
+        setIsGatewayOnline(true);
+        localStorage.setItem("wirelessConfig", JSON.stringify(data));
+        return data;
+      } catch (error) {
+        setIsGatewayOnline(false);
+        const cachedData = localStorage.getItem("wirelessConfig");
+        if (cachedData) {
+          return JSON.parse(cachedData);
+        }
+        throw error;
+      }
+    },
+    retry: 1,
+    retryDelay: 3000,
   });
 
   // Query for DHCP & DNS
   const { data: dhcpDnsData, isLoading: isLoadingDhcpDns, error: dhcpDnsError } = useQuery<DhcpDnsConfig>({
     queryKey: ["network", "dhcp-dns"],
-    queryFn: () => apiClient.getDhcpDns(),
+    queryFn: async () => {
+      try {
+        const data = await apiClient.getDhcpDns();
+        setIsGatewayOnline(true);
+        localStorage.setItem("dhcpDnsConfig", JSON.stringify(data));
+        return data;
+      } catch (error) {
+        setIsGatewayOnline(false);
+        const cachedData = localStorage.getItem("dhcpDnsConfig");
+        if (cachedData) {
+          return JSON.parse(cachedData);
+        }
+        throw error;
+      }
+    },
+    retry: 1,
+    retryDelay: 3000,
   });
 
   // Log query states for debugging
@@ -107,13 +162,31 @@ export default function Network() {
 
   // Mutation for updating eth0
   const interfaceMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { address: string; gateway: string } }) =>
-      apiClient.updateInterface(id, { address: data.address, gateway: data.gateway, status: "up" }),
+    mutationFn: async ({ id, data }: { id: string; data: { address: string; gateway: string } }) => {
+      try {
+        // Try to update online
+        const response = await apiClient.updateInterface(id, { address: data.address, gateway: data.gateway, status: "up" });
+        setIsGatewayOnline(true);
+        return response;
+      } catch (error) {
+        // If offline, save for later
+        setIsGatewayOnline(false);
+        savePendingConfig(`network.cgi?interface=${id}`, "POST", { 
+          interface: id, 
+          ip: data.address, 
+          gateway: data.gateway 
+        });
+        return { 
+          status: "pending", 
+          message: "Configuration saved and will be applied when the gateway is online" 
+        };
+      }
+    },
     onSuccess: (response) => {
       toast({
-        title: response.status === "success" ? "Success" : "Error",
+        title: response.status === "success" ? "Success" : "Pending",
         description: response.message,
-        variant: response.status === "success" ? "default" : "destructive",
+        variant: response.status === "success" ? "default" : "default",
       });
     },
     onError: (error) => {
@@ -125,13 +198,26 @@ export default function Network() {
     },
   });
 
-  // Mutations for wireless and DHCP & DNS (mock)
+  // Wireless mutation with offline support
   const wirelessMutation = useMutation({
-    mutationFn: (config: WirelessConfig) => apiClient.updateWireless(config),
-    onSuccess: () => {
+    mutationFn: async (config: WirelessConfig) => {
+      try {
+        await apiClient.updateWireless(config);
+        setIsGatewayOnline(true);
+        return { status: "success", message: "Wireless configuration updated successfully" };
+      } catch (error) {
+        setIsGatewayOnline(false);
+        savePendingConfig("wireless.cgi", "POST", config);
+        return { 
+          status: "pending", 
+          message: "Wireless configuration saved and will be applied when the gateway is online" 
+        };
+      }
+    },
+    onSuccess: (response) => {
       toast({
-        title: "Success",
-        description: "Wireless configuration updated successfully",
+        title: response.status === "success" ? "Success" : "Pending",
+        description: response.message,
       });
     },
     onError: (error) => {
@@ -143,12 +229,26 @@ export default function Network() {
     },
   });
 
+  // DHCP & DNS mutation with offline support
   const dhcpDnsMutation = useMutation({
-    mutationFn: (config: DhcpDnsConfig) => apiClient.updateDhcpDns(config),
-    onSuccess: () => {
+    mutationFn: async (config: DhcpDnsConfig) => {
+      try {
+        await apiClient.updateDhcpDns(config);
+        setIsGatewayOnline(true);
+        return { status: "success", message: "DHCP & DNS configuration updated successfully" };
+      } catch (error) {
+        setIsGatewayOnline(false);
+        savePendingConfig("dhcp_dns.cgi", "POST", config);
+        return { 
+          status: "pending", 
+          message: "DHCP & DNS configuration saved and will be applied when the gateway is online" 
+        };
+      }
+    },
+    onSuccess: (response) => {
       toast({
-        title: "Success",
-        description: "DHCP & DNS configuration updated successfully",
+        title: response.status === "success" ? "Success" : "Pending",
+        description: response.message,
       });
     },
     onError: (error) => {
@@ -223,22 +323,22 @@ export default function Network() {
   const handleSave = () => {
     const rangeStart = `${subnet}.${rangeStartLastOctet}`;
     const rangeEnd = `${subnet}.${rangeEndLastOctet}`;
-  
+
     if (!isValidLastOctet(rangeStartLastOctet) || !isValidLastOctet(rangeEndLastOctet)) {
       alert("Invalid IP range. Please ensure the last octet is between 0 and 255.");
       return;
     }
-  
+
     const startOctet = parseInt(rangeStartLastOctet, 10);
     const endOctet = parseInt(rangeEndLastOctet, 10);
-  
+
     if (endOctet < startOctet) {
       alert("End range must be greater than or equal to the start range.");
       return;
     }
-  
+
     const limit = endOctet - startOctet + 1; // Calculate the limit
-  
+
     const updatedConfig = {
       ...dhcpDnsConfig,
       rangeStart,
@@ -250,25 +350,19 @@ export default function Network() {
       primaryDns,
       secondaryDns, 
     };
-  
-    apiClient.updateDhcpDns(updatedConfig)
-      .then(() => {
-        toast({
-          title: "Success",
-          description: "DHCP & DNS configuration updated successfully.",
-          variant: "default", // Use "default" for success
-        });
-      })
-      .catch((error) => {
-        toast({
-          title: "Error",
-          description: `Failed to update configuration: ${error.message}`,
-          variant: "destructive", // Use "destructive" for error
-        });
+
+    try {
+      dhcpDnsMutation.mutate(updatedConfig);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to update configuration",
+        variant: "destructive",
       });
+    }
   };
 
-  
+
 
   // Update state when query data changes
   useEffect(() => {
@@ -360,7 +454,15 @@ export default function Network() {
 
   return (
     <div className="container mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-6">Network Configuration</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold">Network Configuration</h1>
+        {!isGatewayOnline && (
+          <div className="flex items-center text-amber-600 bg-amber-50 px-3 py-1 rounded-md">
+            <WifiOff className="h-4 w-4 mr-2" />
+            <span className="text-sm font-medium">Offline Mode - Changes will be applied when gateway is online</span>
+          </div>
+        )}
+      </div>
 
       <Tabs defaultValue="interfaces" className="space-y-4">
         <TabsList>
@@ -722,3 +824,6 @@ export default function Network() {
     </div>
   );
 }
+
+
+

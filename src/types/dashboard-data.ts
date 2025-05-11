@@ -1,20 +1,27 @@
 export interface DashboardData {
-  memoryInfo: string; // Raw output of /proc/meminfo
-  bandwidthInfo: {
-    txRate: string; // Transmit rate in Mbps
-    rxRate: string; // Receive rate in Mbps
+  activeConnectionsInfo: unknown;
+  networkInfo: unknown;
+  memoryInfo?: string;
+  loadaverageInfo?: string;
+  bandwidthInfo?: {
+    txRate?: string;
+    rxRate?: string;
   };
-  activeConnectionsInfo: string; // Raw output of netstat -tulnp
-  connectedDevicesInfo: string; // Raw output of /tmp/dhcp.leases
-  loadaverageInfo: string; // Raw output of /proc/loadavg
-  firewallStatus: {
-    status: boolean; // true if firewall is running, false otherwise
-    rules: {
-      activeRules: number; // Number of active rules
-      totalRules: number; // Total number of rules
-    };
+  firewallStatus?: {
+    totalRules: number;
+    activeRules: number;
+    status: boolean;
+    rules: number;
   };
-  networkInfo: NetworkInterface[]; // Parsed output of network information
+  connectedDevicesInfo?: {
+    devices: {
+      hostname: string;
+      ip: string;
+      mac: string;
+      connectionType: string;
+    }[];
+  };
+  timestamp?: number; // Add timestamp field
 }
 
 export interface NetworkInterface {
