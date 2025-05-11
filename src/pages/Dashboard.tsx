@@ -472,7 +472,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Firewall Status */}
-          <Card className="col-span-2"> {/* Adjust grid span to give more space */}
+          <Card className="col-span-2">
             <CardHeader>
               <CardTitle>Firewall</CardTitle>
             </CardHeader>
@@ -494,10 +494,10 @@ export default function Dashboard() {
                 {/* Summary Info */}
                 <ul className="list-disc pl-5 space-y-1">
                   <li>
-                    <strong>{dashboardData?.firewallStatus?.activeRules || 0}</strong> Active Rules
+                    <strong>{dashboardData?.firewallStatus?.rules?.activeRules || 0}</strong> Active Rules
                   </li>
                   <li>
-                    <strong>{dashboardData?.firewallStatus?.totalRules || 0}</strong> Total Rules
+                    <strong>{dashboardData?.firewallStatus?.rules?.totalRules || 0}</strong> Total Rules
                   </li>
                 </ul>
 
@@ -667,16 +667,4 @@ export default function Dashboard() {
     </div>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
 

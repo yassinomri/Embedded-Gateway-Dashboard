@@ -8,10 +8,11 @@ export interface DashboardData {
     rxRate?: string;
   };
   firewallStatus?: {
-    totalRules: number;
-    activeRules: number;
     status: boolean;
-    rules: number;
+    rules: {
+      activeRules: number;
+      totalRules: number;
+    };
   };
   connectedDevicesInfo?: {
     devices: {
