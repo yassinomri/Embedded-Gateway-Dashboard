@@ -543,10 +543,41 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
+                    {/* Connected Devices */}
+          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+            <CardHeader>
+              <CardTitle>Connected Devices</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {connectedDevices && connectedDevices.length > 0 ? (
+                <table className="table-auto w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-2 text-left">IP Address</th>
+                      <th className="px-4 py-2 text-left">MAC Address</th>
+                      <th className="px-4 py-2 text-left">Hostname</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {connectedDevices.map((device, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="px-4 py-2">{device.ip}</td>
+                        <td className="px-4 py-2">{device.mac}</td>
+                        <td className="px-4 py-2">{device.hostname || "N/A"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p>No connected devices found.</p>
+              )}
+            </CardContent>
+          </Card>
+
 
 
                 {/* Network Interfaces Section */}
-          <Card>
+          <Card className="col-span-4">
             <CardHeader>
               <CardTitle>Network Interfaces</CardTitle>
             </CardHeader>
@@ -586,39 +617,6 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-
-          {/* Connected Devices */}
-          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
-            <CardHeader>
-              <CardTitle>Connected Devices</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {connectedDevices && connectedDevices.length > 0 ? (
-                <table className="table-auto w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-2 text-left">IP Address</th>
-                      <th className="px-4 py-2 text-left">MAC Address</th>
-                      <th className="px-4 py-2 text-left">Hostname</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {connectedDevices.map((device, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2">{device.ip}</td>
-                        <td className="px-4 py-2">{device.mac}</td>
-                        <td className="px-4 py-2">{device.hostname || "N/A"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>No connected devices found.</p>
-              )}
-            </CardContent>
-          </Card>
-
-
 
           {/* Active Connections */}
           <Card className="col-span-4"> {/* Adjust grid span to give more space */}
