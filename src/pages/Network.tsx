@@ -293,7 +293,8 @@ export default function Network() {
   };
 
   const validateWireless = () => {
-    if (!isValidSSID(wirelessConfig.ssid)) {
+    // Trim the SSID to check for empty strings with spaces
+    if (!wirelessConfig.ssid || wirelessConfig.ssid.trim() === "" || wirelessConfig.ssid.length > 32) {
       return false;
     }
     
@@ -305,7 +306,7 @@ export default function Network() {
   };
 
   const isValidSSID = (ssid: string) => {
-    return ssid.length > 0 && ssid.length <= 32;
+    return ssid && ssid.trim() !== "" && ssid.length <= 32;
   };
 
   const isValidPassword = (password: string) => {
@@ -920,6 +921,8 @@ export default function Network() {
     </div>
   );
 }
+
+
 
 
 

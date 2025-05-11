@@ -140,6 +140,11 @@ export const apiClient = {
     const url = "http://192.168.1.1/cgi-bin/wireless.cgi";
     console.log("updateWireless Request:", { url, config });
 
+    // Validate SSID before sending
+    if (!config.ssid || config.ssid.trim() === "" || config.ssid.length > 32) {
+      return { status: "error", message: "Invalid SSID" };
+    }
+
     // Send the config as-is without mapping encryption types
     const response = await fetch(url, {
       method: "POST",

@@ -85,18 +85,30 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     read -r INPUT_JSON
     echo "$(date): Received data: $INPUT_JSON" >> $LOG_FILE
     
+    # Debug the JSON parsing
+    echo "$(date): Attempting to parse JSON with jq" >> $LOG_FILE
+    echo "$INPUT_JSON" | jq '.' >> $LOG_FILE 2>&1
+    
     SSID=$(echo "$INPUT_JSON" | jq -r '.ssid')
     PASSWORD=$(echo "$INPUT_JSON" | jq -r '.password')
     ENCRYPTION=$(echo "$INPUT_JSON" | jq -r '.encryption')
     CHANNEL=$(echo "$INPUT_JSON" | jq -r '.channel')
     ENABLED=$(echo "$INPUT_JSON" | jq -r '.enabled')
+    BAND=$(echo "$INPUT_JSON" | jq -r '.band')
     
-    echo "$(date): Parsed values: SSID=$SSID, ENCRYPTION=$ENCRYPTION, CHANNEL=$CHANNEL, ENABLED=$ENABLED" >> $LOG_FILE
+    echo "$(date): Parsed values: SSID='$SSID', ENCRYPTION='$ENCRYPTION', CHANNEL='$CHANNEL', ENABLED='$ENABLED', BAND='$BAND'" >> $LOG_FILE
 
-    # Validate input
-    if [ -z "$SSID" ] || [ ${#SSID} -gt 32 ]; then
-        echo "$(date): Invalid SSID" >> $LOG_FILE
-        echo "{\"status\": \"error\", \"message\": \"Invalid SSID\"}"
+    # Validate input with better debugging
+    echo "$(date): SSID validation: length=${#SSID}, value='$SSID'" >> $LOG_FILE
+    if [ -z "$SSID" ]; then
+        echo "$(date): SSID is empty" >> $LOG_FILE
+        echo "{\"status\": \"error\", \"message\": \"SSID cannot be empty\"}"
+        exit 1
+    fi
+    
+    if [ ${#SSID} -gt 32 ]; then
+        echo "$(date): SSID too long (${#SSID} chars)" >> $LOG_FILE
+        echo "{\"status\": \"error\", \"message\": \"SSID must be 32 characters or less\"}"
         exit 1
     fi
 
@@ -104,6 +116,12 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         echo "$(date): Invalid password" >> $LOG_FILE
         echo "{\"status\": \"error\", \"message\": \"Invalid password\"}"
         exit 1
+    fi
+
+    # Set default band if not provided
+    if [ -z "$BAND" ]; then
+        BAND="2.4g"
+        echo "$(date): Using default band: $BAND" >> $LOG_FILE
     fi
 
     # Update wireless configuration
@@ -116,6 +134,7 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         uci delete wireless.@wifi-iface[0].key 2>/dev/null
     fi
     uci set wireless.radio0.channel="$CHANNEL"
+    uci set wireless.radio0.band="$BAND"
     if [ "$ENABLED" = "true" ]; then
         uci delete wireless.@wifi-iface[0].disabled 2>/dev/null
     else
@@ -136,6 +155,10 @@ fi
 echo "$(date): Unsupported method: $REQUEST_METHOD" >> $LOG_FILE
 echo "{\"status\": \"error\", \"message\": \"Unsupported request method: $REQUEST_METHOD\"}"
 exit 1
+
+
+
+
 
 
 
