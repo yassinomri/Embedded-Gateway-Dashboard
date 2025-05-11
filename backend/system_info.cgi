@@ -30,7 +30,7 @@ fi
 
 
 
-version=$(cat /proc/version)
+version=$(cat /proc/version | sed 's/ #.*$//')
 date=$(date | awk '{print $1 " " $2 " " $3 " " $4 " " $6}')
 hostname=$(grep "hostname" /etc/config/system | awk '{print $3}')
 cpu_model=$(grep -m 1 '^Model' /proc/cpuinfo | cut -d ':' -f2 | xargs)
