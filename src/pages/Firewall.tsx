@@ -302,16 +302,19 @@ const handleToggleFirewall = async () => {
         </label>
       </div>
 
-        <label className="total-rules-label">
-          Total Rules: <span className="total-rules-count">{}</span>
-        </label>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="primary-button add-rule-button"
-          disabled={updatePending}
-        >
-          <Plus size={20} /> Add Rule
-        </button>
+          <label className="total-rules-label">
+            Total Rules: <span className="total-rules-count">{rules.length}</span>
+          </label>
+
+        <div className="header-actions">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="primary-button add-rule-button"
+            disabled={updatePending}
+          >
+            <Plus size={20} /> Add Rule
+          </button>
+        </div>
       </div>
   
       {rules.length === 0 ? (

@@ -357,3 +357,21 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.total-rules-label {
+  font-size: 15px;
+  color: #555;
+  display: flex;
+  align-items: center;
+}
+
+.total-rules-count {
+  font-weight: 600;
+  color: #147AA6;
+  margin-left: 5px;
+  background-color: rgba(20, 122, 166, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 24px;
+  text-align: center;
+}
