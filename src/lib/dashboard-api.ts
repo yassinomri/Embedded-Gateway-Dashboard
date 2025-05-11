@@ -4,24 +4,40 @@ import { savePendingConfig } from "./offline-config";
 export const apiClient = {
     getDashboardData: async (): Promise<DashboardData> => {
         const url = "http://192.168.1.1/cgi-bin/dashboard_data.cgi";
-        try {
-          const response = await fetch(url, {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            signal: AbortSignal.timeout(5000), // Use AbortSignal for timeout
-          });
+        const maxRetries = 3;
+        let retryCount = 0;
         
-          if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-          }
+        while (retryCount < maxRetries) {
+          try {
+            const response = await fetch(url, {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              signal: AbortSignal.timeout(8000), // Increase timeout to 8 seconds
+            });
           
-          return await response.json();
-        } catch (error) {
-          console.error("Error fetching dashboard data:", error);
-          throw error; 
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            
+            return await response.json();
+          } catch (error) {
+            retryCount++;
+            console.warn(`Attempt ${retryCount}/${maxRetries} failed:`, error);
+            
+            if (retryCount >= maxRetries) {
+              console.error("Error fetching dashboard data after retries:", error);
+              throw error;
+            }
+            
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+          }
         }
+        
+        // This should never be reached due to the throw in the catch block
+        throw new Error("Failed to fetch dashboard data after retries");
     },
     
     // Add a method to update configuration with offline support

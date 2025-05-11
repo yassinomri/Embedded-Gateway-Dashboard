@@ -1,56 +1,11 @@
 import React, { useEffect, useState, useMemo, Suspense } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button"; // Assuming you have a Button component
+import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
 import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
 import { PowerIcon, WifiOff } from "lucide-react";
 import { SyncManager } from "@/components/SyncManager";
-
-// Function to format memory values
-const formatMemory = (value: number): string => {
-  if (value < 1024) {
-    return `${value} KB`; // Less than 1 MB
-  } else if (value < 1024 * 1024) {
-    return `${(value / 1024).toFixed(2)} MB`; // Less than 1 GB
-  } else {
-    return `${(value / (1024 * 1024)).toFixed(2)} GB`; // 1 GB or more
-  }
-};
-
-// Function to format bytes
-const formatBytes = (bytes: string | number, decimals: number = 2): string => {
-  if (!bytes) return "0 B";
-  
-  const value = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
-  if (value === 0) return "0 B";
-  
-  const k = 1024;
-  const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
-  
-  const i = Math.floor(Math.log(value) / Math.log(k));
-  
-  return `${parseFloat((value / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-};
-
-// Function to format bandwidth values
-const formatBandwidth = (value: string | number): string => {
-  if (!value) return "0 Kbps";
-
-  const numericValue = typeof value === "string" ? parseFloat(value) : value;
-
-  if (numericValue < 1) {
-    // Convert to Kbps if less than 1 Mbps
-    return `${(numericValue * 1000).toFixed(2)} Kbps`;
-  }
-
-  // Keep in Mbps if 1 or greater
-  return `${numericValue.toFixed(2)} Mbps`;
-};
-
-const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
-const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
 import {
   Chart as ChartJS,
   ArcElement,
@@ -62,140 +17,112 @@ import {
   LineElement,
 } from "chart.js";
 
-// Register Chart.js components
-ChartJS.register(
-  ArcElement,
-  Tooltip,
-  Legend,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement
-);
-
-const Dashboard: React.FC = () => {
+export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [historicalData, setHistoricalData] = useState<{ time: string; throughput: number }[]>([]);
-  const [bandwidthHistory, setBandwidthHistory] = useState<
-    { time: string; uploadRate: number; downloadRate: number }[]
-  >([]);
-  const [systemOnline, setSystemOnline] = useState(true);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await apiClient.getDashboardData();
-        setDashboardData(response);
-        setSystemOnline(true);
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-        setError("Failed to fetch dashboard data.");
-        setSystemOnline(false);
-        // No longer loading from cache
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    console.log("Dashboard Data:", dashboardData);
-  }, [dashboardData]);
-
-  useEffect(() => {
-    console.log("Connected Devices Info:", dashboardData?.connectedDevicesInfo);
-  }, [dashboardData?.connectedDevicesInfo]);
-
-  useEffect(() => {
-    const saveBandwidthData = async () => {
-      if (dashboardData?.bandwidthInfo) {
-        const txRate = parseFloat(dashboardData.bandwidthInfo.txRate || "0");
-        const rxRate = parseFloat(dashboardData.bandwidthInfo.rxRate || "0");
-
-        await savePerformanceData({
-          latency: 0, // Placeholder if latency is not available
-          packetLoss: 0, // Placeholder if packet loss is not available
-          throughput: txRate + rxRate, // Total bandwidth (upload + download)
-        });
-      }
-    };
-
-    const interval = setInterval(saveBandwidthData, 5000); // Save every 5 seconds
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, [dashboardData?.bandwidthInfo]);
-
-  useEffect(() => {
-    const fetchHistoricalData = async () => {
-      const data = await getHistoricalData(50); // Fetch the last 50 entries
-      setHistoricalData(data.map(entry => ({
-        time: new Date(entry.time).toLocaleTimeString(), // Format time for the graph
-        throughput: entry.throughput, // Total bandwidth
-      })));
-    };
-
-    fetchHistoricalData();
-  }, []);
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const data = await getHistoricalData(50);
-      setHistoricalData(data.map(entry => ({
-        time: new Date(entry.time).toLocaleTimeString(),
-        throughput: entry.throughput,
-      })));
-    }, 5000); // Update every 5 seconds
-
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, []);
-
-  useEffect(() => {
-    const saveBandwidth = async () => {
-      if (dashboardData?.bandwidthInfo) {
-        const uploadRate = parseFloat(dashboardData.bandwidthInfo.txRate || "0");
-        const downloadRate = parseFloat(dashboardData.bandwidthInfo.rxRate || "0");
-
-        await saveBandwidthData({ uploadRate, downloadRate });
-      }
-    };
-
-    const interval = setInterval(saveBandwidth, 5000); // Save every 5 seconds
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, [dashboardData?.bandwidthInfo]);
-
+  const [systemOnline, setSystemOnline] = useState(false);
+  const [historicalData, setHistoricalData] = useState([]);
+  const [bandwidthHistory, setBandwidthHistory] = useState<{time: string; uploadRate: number; downloadRate: number}[]>([]);
+  
+  // Fetch bandwidth history on component mount
   useEffect(() => {
     const fetchBandwidthHistory = async () => {
-      const data = await getBandwidthData(50); // Fetch the last 50 entries
-      setBandwidthHistory(
-        data.map(entry => ({
-          time: new Date(new Date(entry.time).getTime() + 60 * 60 * 1000).toLocaleTimeString(), // Add 1 hour
-          uploadRate: entry.uploadRate,
-          downloadRate: entry.downloadRate,
-        }))
-      );
+      try {
+        const data = await getBandwidthData(50);
+        setBandwidthHistory(data);
+      } catch (error) {
+        console.error("Error fetching bandwidth history:", error);
+      }
     };
-
+    
     fetchBandwidthHistory();
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const data = await getBandwidthData(50);
-      setBandwidthHistory(
-        data.map(entry => ({
-          time: new Date(new Date(entry.time).getTime() + 60 * 60 * 1000).toLocaleTimeString(), // Add 1 hour
-          uploadRate: entry.uploadRate,
-          downloadRate: entry.downloadRate,
-        }))
-      );
-    }, 5000); // Update every 5 seconds
+  // Function to fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      console.log("Attempting to fetch dashboard data...");
+      const response = await apiClient.getDashboardData();
+      setDashboardData(response);
+      setSystemOnline(true);
+      setError(null);
+      console.log("Dashboard data fetched successfully");
+    } catch (err) {
+      console.error("Error fetching dashboard data:", err);
+      setSystemOnline(false);
+      setError("Failed to fetch dashboard data.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => clearInterval(interval); // Cleanup on unmount
+  // Initial data fetch
+  useEffect(() => {
+    fetchDashboardData();
+    
+    // Set up polling to periodically check if gateway is online
+    const intervalId = setInterval(() => {
+      fetchDashboardData();
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(intervalId);
   }, []);
 
+  // Function to format memory values
+  const formatMemory = (value: number): string => {
+    if (value < 1024) {
+      return `${value} KB`; // Less than 1 MB
+    } else if (value < 1024 * 1024) {
+      return `${(value / 1024).toFixed(2)} MB`; // Less than 1 GB
+    } else {
+      return `${(value / (1024 * 1024)).toFixed(2)} GB`; // 1 GB or more
+    }
+  };
+
+  // Function to format bytes
+  const formatBytes = (bytes: string | number, decimals: number = 2): string => {
+    if (!bytes) return "0 B";
+    
+    const value = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
+    if (value === 0) return "0 B";
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
+    
+    const i = Math.floor(Math.log(value) / Math.log(k));
+    
+    return `${parseFloat((value / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  };
+
+  // Function to format bandwidth values
+  const formatBandwidth = (value: string | number): string => {
+    if (!value) return "0 Kbps";
+
+    const numericValue = typeof value === "string" ? parseFloat(value) : value;
+
+    if (numericValue < 1) {
+      // Convert to Kbps if less than 1 Mbps
+      return `${(numericValue * 1000).toFixed(2)} Kbps`;
+    }
+
+    // Keep in Mbps if 1 or greater
+    return `${numericValue.toFixed(2)} Mbps`;
+  };
+
+  const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
+  const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
+  // Register Chart.js components
+  ChartJS.register(
+    ArcElement,
+    Tooltip,
+    Legend,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement
+  );
 
   const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
   const errorContent = error ? <p className="text-red-500">{error}</p> : null;
@@ -741,7 +668,12 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard;
+
+
+
+
+
+
 
 
 

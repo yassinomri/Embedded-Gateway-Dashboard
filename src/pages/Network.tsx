@@ -40,7 +40,42 @@ export default function Network() {
   const queryClient = useQueryClient();
 
   // Add a state to track if the gateway is online
-  const [isGatewayOnline, setIsGatewayOnline] = useState(true);
+  const [isGatewayOnline, setIsGatewayOnline] = useState(false);
+
+  // Function to check if gateway is online
+  const checkGatewayStatus = async () => {
+    try {
+      // Try to fetch a simple resource from the gateway
+      const response = await fetch("http://192.168.1.1/cgi-bin/ping.cgi", {
+        method: "GET",
+        signal: AbortSignal.timeout(3000)
+      });
+      
+      if (response.ok) {
+        setIsGatewayOnline(true);
+        return true;
+      } else {
+        setIsGatewayOnline(false);
+        return false;
+      }
+    } catch (error) {
+      setIsGatewayOnline(false);
+      return false;
+    }
+  };
+
+  // Set up periodic checking
+  useEffect(() => {
+    // Check immediately on component mount
+    checkGatewayStatus();
+    
+    // Set up interval to check periodically
+    const intervalId = setInterval(() => {
+      checkGatewayStatus();
+    }, 10000); // Check every 10 seconds
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Add state for password visibility
   const [showPassword, setShowPassword] = useState(false);
@@ -921,6 +956,10 @@ export default function Network() {
     </div>
   );
 }
+
+
+
+
 
 
 
