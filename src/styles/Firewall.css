@@ -375,3 +375,43 @@
   min-width: 24px;
   text-align: center;
 }
+
+.actions-column {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.action-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.edit-icon {
+  color: #147AA6;
+}
+
+.edit-icon:hover:not(:disabled) {
+  background-color: rgba(20, 122, 166, 0.1);
+}
+
+.delete-icon {
+  color: #e53935;
+}
+
+.delete-icon:hover:not(:disabled) {
+  background-color: rgba(229, 57, 53, 0.1);
+}
+
+.action-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Shield, Trash2, Plus, AlertTriangle } from 'lucide-react';
+import { Shield, Trash2, Plus, AlertTriangle, Edit2 } from 'lucide-react';
 import { FirewallConfig, Rule} from '@/types/firewall';
 import { useToast } from '../hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -50,6 +50,7 @@ const Firewall: React.FC = () => {
     target: 'ACCEPT',
     enabled: true,
   });
+  const [editingRule, setEditingRule] = useState<Rule | null>(null);
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -135,7 +136,7 @@ const Firewall: React.FC = () => {
   }, []);
 
   // Handle adding a new rule with optimistic updates
-  const handleAddRule = async (e: React.FormEvent) => {
+  const handleSaveRule = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRule.name) {
       toast({
@@ -147,41 +148,90 @@ const Firewall: React.FC = () => {
     }
 
     setUpdatePending(true);
-    const rule: Rule = {
-      id: `temp-${Date.now()}`,
-      name: newRule.name,
-      src: newRule.src || 'any',
-      dest: newRule.dest || 'any',
-      proto: newRule.proto || 'tcp',
-      target: newRule.target || 'ACCEPT',
-      enabled: newRule.enabled ?? true,
-    };
+    
+    // If editing existing rule
+    if (editingRule) {
+      const updatedRule: Rule = {
+        ...editingRule,
+        name: newRule.name,
+        src: newRule.src || 'any',
+        dest: newRule.dest || 'any',
+        proto: newRule.proto || 'tcp',
+        target: newRule.target || 'ACCEPT',
+        enabled: newRule.enabled ?? true,
+      };
 
-    // Optimistic update
-    const previousConfig = config;
-    setConfig(current => ({
-      ...current,
-      rules: [...current.rules, rule]
-    }));
+      // Optimistic update
+      const previousConfig = config;
+      setConfig(current => ({
+        ...current,
+        rules: current.rules.map(rule => 
+          rule.id === editingRule.id ? updatedRule : rule
+        )
+      }));
 
-    try {
-      await debouncedUpdateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
-      toast({
-        title: 'Success',
-        description: 'Rule added successfully',
-      });
-      setIsModalOpen(false);
-      setNewRule(initialRuleState);
-    } catch (error) {
-      // Revert on error
-      setConfig(previousConfig);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to add rule',
-      });
-    } finally {
-      setUpdatePending(false);
+      try {
+        await debouncedUpdateFirewall({ 
+          action: 'update', 
+          enabled: config.enabled, 
+          rules: [updatedRule] 
+        });
+        toast({
+          title: 'Success',
+          description: 'Rule updated successfully',
+        });
+        setIsModalOpen(false);
+        setNewRule(initialRuleState);
+        setEditingRule(null);
+      } catch (error) {
+        // Revert on error
+        setConfig(previousConfig);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to update rule',
+        });
+      } finally {
+        setUpdatePending(false);
+      }
+    } else {
+      // Add new rule (existing code)
+      const rule: Rule = {
+        id: `temp-${Date.now()}`,
+        name: newRule.name,
+        src: newRule.src || 'any',
+        dest: newRule.dest || 'any',
+        proto: newRule.proto || 'tcp',
+        target: newRule.target || 'ACCEPT',
+        enabled: newRule.enabled ?? true,
+      };
+
+      // Optimistic update
+      const previousConfig = config;
+      setConfig(current => ({
+        ...current,
+        rules: [...current.rules, rule]
+      }));
+
+      try {
+        await debouncedUpdateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
+        toast({
+          title: 'Success',
+          description: 'Rule added successfully',
+        });
+        setIsModalOpen(false);
+        setNewRule(initialRuleState);
+      } catch (error) {
+        // Revert on error
+        setConfig(previousConfig);
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to add rule',
+        });
+      } finally {
+        setUpdatePending(false);
+      }
     }
   };
 
@@ -274,6 +324,19 @@ const handleToggleFirewall = async () => {
     );
   }
 
+  function handleEditClick(rule: Rule): void {
+    setEditingRule(rule);
+    setNewRule({
+      name: rule.name,
+      src: rule.src,
+      dest: rule.dest,
+      proto: rule.proto,
+      target: rule.target,
+      enabled: rule.enabled,
+    });
+    setIsModalOpen(true);
+  }
+
   return (
     <div className="page-container">
       <header className="page-header">
@@ -358,6 +421,13 @@ const handleToggleFirewall = async () => {
                   <td>
                     <div className="actions-column">
                       <button
+                        className="action-icon edit-icon"
+                        onClick={() => !updatePending && handleEditClick(rule)}
+                        disabled={updatePending}
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
                         className="action-icon delete-icon"
                         onClick={() => !updatePending && handleDeleteRule(rule.id)}
                         disabled={updatePending}
@@ -378,19 +448,32 @@ const handleToggleFirewall = async () => {
           <div className="modal">
             <header className="modal-header">
               <h2>
-                <Plus size={24} color="#00f6ff" />
-                Add New Rule
+                {editingRule ? (
+                  <>
+                    <Edit2 size={24} color="#00f6ff" />
+                    Edit Rule
+                  </>
+                ) : (
+                  <>
+                    <Plus size={24} color="#00f6ff" />
+                    Add New Rule
+                  </>
+                )}
               </h2>
               <button 
                 type="button" 
                 className="modal-close-button" 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setEditingRule(null);
+                  setNewRule(initialRuleState);
+                }}
                 aria-label="Close"
               >
                 ×
               </button>
             </header>
-            <form onSubmit={handleAddRule} className="modal-form">
+            <form onSubmit={handleSaveRule} className="modal-form">
               <div className="form-grid">
                 <div className="form-group">
                   <label htmlFor="name">Rule Name</label>
@@ -495,7 +578,9 @@ const handleToggleFirewall = async () => {
                   className="primary-button"
                   disabled={updatePending}
                 >
-                  {updatePending ? 'Adding...' : 'Add Rule'}
+                  {updatePending 
+                    ? (editingRule ? 'Updating...' : 'Adding...') 
+                    : (editingRule ? 'Update Rule' : 'Add Rule')}
                 </button>
               </footer>
             </form>
