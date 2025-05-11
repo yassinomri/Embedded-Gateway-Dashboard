@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useMemo, Suspense } from "react";
+import React, { useEffect, useState, useMemo, Suspense, memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
 import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
-import { PowerIcon, WifiOff } from "lucide-react";
+import { PowerIcon, WifiOff, RefreshCw } from "lucide-react";
 import { SyncManager } from "@/components/SyncManager";
 import {
   Chart as ChartJS,
@@ -16,58 +16,92 @@ import {
   PointElement,
   LineElement,
 } from "chart.js";
+import { useQuery } from '@tanstack/react-query';
+
+// Memoize chart components to prevent unnecessary re-renders
+const MemoizedDoughnut = memo(React.lazy(() => 
+  import("react-chartjs-2").then((module) => ({ default: module.Doughnut }))
+));
+
+const MemoizedLine = memo(React.lazy(() => 
+  import("react-chartjs-2").then((module) => ({ default: module.Line }))
+));
+
+// Create lightweight skeleton components
+const ChartSkeleton = () => (
+  <div className="h-64 bg-gray-100 animate-pulse rounded-md flex items-center justify-center">
+    <span className="text-gray-400">Loading chart...</span>
+  </div>
+);
+
+const TableSkeleton = () => (
+  <div className="space-y-3">
+    <div className="h-8 bg-gray-100 animate-pulse rounded-md w-full"></div>
+    {[...Array(5)].map((_, i) => (
+      <div key={i} className="h-10 bg-gray-100 animate-pulse rounded-md w-full"></div>
+    ))}
+  </div>
+);
 
 export default function Dashboard() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Use React Query for data fetching with caching
+  const { 
+    data: dashboardData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
+    queryKey: ['dashboardData'],
+    queryFn: async () => {
+      try {
+        console.log("Fetching dashboard data...");
+        const response = await apiClient.getDashboardData();
+        setSystemOnline(true);
+        return response;
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setSystemOnline(false);
+        throw err;
+      }
+    },
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes
+    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    retry: 1, // Only retry once on failure
+  });
+
+  // Rest of your state variables
   const [systemOnline, setSystemOnline] = useState(false);
   const [historicalData, setHistoricalData] = useState([]);
   const [bandwidthHistory, setBandwidthHistory] = useState<{time: string; uploadRate: number; downloadRate: number}[]>([]);
   
-  // Fetch bandwidth history on component mount
+  // Fetch bandwidth history only once on component mount
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchBandwidthHistory = async () => {
       try {
         const data = await getBandwidthData(50);
-        setBandwidthHistory(data);
+        if (isMounted) {
+          setBandwidthHistory(data);
+        }
       } catch (error) {
         console.error("Error fetching bandwidth history:", error);
       }
     };
     
     fetchBandwidthHistory();
-  }, []);
-
-  // Function to fetch dashboard data
-  const fetchDashboardData = async () => {
-    try {
-      console.log("Attempting to fetch dashboard data...");
-      const response = await apiClient.getDashboardData();
-      setDashboardData(response);
-      setSystemOnline(true);
-      setError(null);
-      console.log("Dashboard data fetched successfully");
-    } catch (err) {
-      console.error("Error fetching dashboard data:", err);
-      setSystemOnline(false);
-      setError("Failed to fetch dashboard data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Initial data fetch
-  useEffect(() => {
-    fetchDashboardData();
     
-    // Set up polling to periodically check if gateway is online
+    // Set up polling with a cleanup function
     const intervalId = setInterval(() => {
-      fetchDashboardData();
+      refetch();
     }, 10000); // Check every 10 seconds
     
-    return () => clearInterval(intervalId);
-  }, []);
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [refetch]);
 
   // Function to format memory values
   const formatMemory = (value: number): string => {
@@ -111,8 +145,6 @@ export default function Dashboard() {
     return `${numericValue.toFixed(2)} Mbps`;
   };
 
-  const Doughnut = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Doughnut })));
-  const Line = React.lazy(() => import("react-chartjs-2").then((module) => ({ default: module.Line })));
   // Register Chart.js components
   ChartJS.register(
     ArcElement,
@@ -124,22 +156,28 @@ export default function Dashboard() {
     LineElement
   );
 
-  const loadingContent = loading ? <p>Loading dashboard data...</p> : null;
-  const errorContent = error ? <p className="text-red-500">{error}</p> : null;
+  const loadingContent = isLoading ? <p>Loading dashboard data...</p> : null;
+  const errorContent = error ? <p className="text-red-500">{error instanceof Error ? error.message : String(error)}</p> : null;
 
-  // Parse memory info
+  // Use useMemo for expensive calculations to prevent recalculations on re-renders
   const memoryInfo = useMemo(() => {
     if (!dashboardData?.memoryInfo) return {};
-    return dashboardData.memoryInfo
-      .toString()
-      .split("\n")
-      .reduce((acc: Record<string, string>, line) => {
-        const [key, value] = line.split(":");
-        if (key && value) {
-          acc[key.trim()] = value.trim();
-        }
-        return acc;
-      }, {});
+    
+    // Use a more efficient parsing approach
+    const result: Record<string, string> = {};
+    const lines = dashboardData.memoryInfo.toString().split("\n");
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const colonIndex = line.indexOf(':');
+      if (colonIndex > 0) {
+        const key = line.substring(0, colonIndex).trim();
+        const value = line.substring(colonIndex + 1).trim();
+        result[key] = value;
+      }
+    }
+    
+    return result;
   }, [dashboardData?.memoryInfo]);
 
   const totalMemory = parseInt(memoryInfo?.MemTotal || "0");
@@ -345,9 +383,18 @@ export default function Dashboard() {
   }, [dashboardData?.networkInfo]);
 
 
-  if (loading) return loadingContent;
-  // Remove the error check that was showing the generic error message
-  
+  if (isLoading) return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {/* Skeleton loaders */}
+        <div className="col-span-2"><ChartSkeleton /></div>
+        <div className="col-span-2"><ChartSkeleton /></div>
+        <div className="col-span-4"><ChartSkeleton /></div>
+        <div className="col-span-4"><TableSkeleton /></div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <SyncManager autoSync={true} />
@@ -362,6 +409,13 @@ export default function Dashboard() {
             fill={systemOnline ? "currentColor" : "none"}
           />
         </div>
+        <button 
+          onClick={() => refetch()} 
+          className="refresh-button"
+          aria-label="Refresh data"
+        >
+          <RefreshCw size={20} className={isLoading ? "animate-spin" : ""} />
+        </button>
       </div>
 
       {/* Show offline message when system is offline */}
@@ -393,10 +447,8 @@ export default function Dashboard() {
               <div className="flex justify-between items-center">
                 {/* Memory Usage Chart */}
                 <div className="w-1/2">
-                  <Suspense fallback={<div className="h-32 flex items-center justify-center">
-                    <p>Loading Memory chart...</p>
-                  </div>}>
-                    <Doughnut 
+                  <Suspense fallback={<ChartSkeleton />}>
+                    <MemoizedDoughnut 
                       data={memoryChartData} 
                       options={{
                         responsive: true,
@@ -419,10 +471,8 @@ export default function Dashboard() {
 
                 {/* CPU Usage Chart */}
                 <div className="w-1/2">
-                  <Suspense fallback={<div className="h-32 flex items-center justify-center">
-                    <p>Loading CPU chart...</p>
-                  </div>}>
-                    <Doughnut 
+                  <Suspense fallback={<ChartSkeleton />}>
+                    <MemoizedDoughnut 
                       data={cpuChartData} 
                       options={{
                         responsive: true,
@@ -537,7 +587,7 @@ export default function Dashboard() {
 
                 {/* Bandwidth Chart */}
                 <Suspense fallback={<p>Loading chart...</p>}>
-                  {bandwidthChartData && <Line data={bandwidthChartData} />}
+                  {bandwidthChartData && <MemoizedLine data={bandwidthChartData} />}
                 </Suspense>
               </div>
             </CardContent>
@@ -665,3 +715,6 @@ export default function Dashboard() {
     </div>
   );
 };
+
+
+
