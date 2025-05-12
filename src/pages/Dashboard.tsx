@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
 import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
-import { PowerIcon, WifiOff, RefreshCw } from "lucide-react";
+import { PowerIcon, WifiOff, RefreshCw, Network, Wifi } from "lucide-react";
 import { SyncManager } from "@/components/SyncManager";
 import {
   Chart as ChartJS,
@@ -15,6 +15,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  ChartData
 } from "chart.js";
 import { useQuery } from '@tanstack/react-query';
 
@@ -88,22 +89,43 @@ export default function Dashboard() {
     wifi: "phy0-ap0"
   });
   
+  // Add these state variables for the bandwidth charts
+  const [ethernetBandwidthChartData, setEthernetBandwidthChartData] = useState<ChartData<'line'> | null>(null);
+  const [wifiBandwidthChartData, setWifiBandwidthChartData] = useState<ChartData<'line'> | null>(null);  
   // Fetch bandwidth history only once on component mount
   useEffect(() => {
     let isMounted = true;
     
-    const fetchBandwidthHistory = async (data: { time: string; uploadRate: number; downloadRate: number; }[]) => {
+    const fetchBandwidthHistory = async () => {
       try {
-        const data = await getBandwidthData(50);
+        const ethernetData = await getBandwidthData("ethernet");
+        const wifiData = await getBandwidthData("wifi");
+        
         if (isMounted) {
-          fetchBandwidthHistory(data);
+          // Transform the data to match expected format
+          const transformedEthernetData = ethernetData.map(entry => ({
+            time: entry.time,
+            uploadRate: entry.upload,
+            downloadRate: entry.download,
+            interface: selectedInterfaces.ethernet
+          }));
+          
+          const transformedWifiData = wifiData.map(entry => ({
+            time: entry.time,
+            uploadRate: entry.upload,
+            downloadRate: entry.download,
+            interface: selectedInterfaces.wifi
+          }));
+          
+          setEth0BandwidthHistory(transformedEthernetData);
+          setWifiBandwidthHistory(transformedWifiData);
         }
       } catch (error) {
         console.error("Error fetching bandwidth history:", error);
       }
     };
     
-    fetchBandwidthHistory([]);
+    fetchBandwidthHistory();
     
     // Set up polling with a cleanup function
     const intervalId = setInterval(() => {
@@ -114,7 +136,7 @@ export default function Dashboard() {
       isMounted = false;
       clearInterval(intervalId);
     };
-  }, [refetch]);
+  }, [refetch, selectedInterfaces.ethernet, selectedInterfaces.wifi]);
 
   // Function to format memory values
   const formatMemory = (value: number): string => {
@@ -128,33 +150,27 @@ export default function Dashboard() {
   };
 
   // Function to format bytes
-  const formatBytes = (bytes: string | number, decimals: number = 2): string => {
+  const formatBytes = (bytes: string | number | undefined, decimals: number = 2): string => {
     if (!bytes) return "0 B";
-    
-    const value = typeof bytes === 'string' ? parseInt(bytes, 10) : bytes;
-    if (value === 0) return "0 B";
-    
+    const value = typeof bytes === 'string' ? parseFloat(bytes) : bytes;
+    if (value === 0 || isNaN(value)) return "0 B";
+
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
     const sizes = ["B", "KB", "MB", "GB", "TB", "PB"];
-    
     const i = Math.floor(Math.log(value) / Math.log(k));
-    
     return `${parseFloat((value / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
   };
 
   // Function to format bandwidth values
-  const formatBandwidth = (value: string | number): string => {
+  const formatBandwidth = (value: string | number | undefined): string => {
     if (!value) return "0 Kbps";
-
     const numericValue = typeof value === "string" ? parseFloat(value) : value;
+    if (isNaN(numericValue)) return "0 Kbps";
 
     if (numericValue < 1) {
-      // Convert to Kbps if less than 1 Mbps
       return `${(numericValue * 1000).toFixed(2)} Kbps`;
     }
-
-    // Keep in Mbps if 1 or greater
     return `${numericValue.toFixed(2)} Mbps`;
   };
 
@@ -406,10 +422,13 @@ export default function Dashboard() {
   }, [interfacePrevValues, networkInterfaces, selectedInterfaces]);
 
   // Ethernet bandwidth chart data
-  const eth0BandwidthChartData = useMemo(() => {
-    if (eth0BandwidthHistory.length === 0) return null;
+  useEffect(() => {
+    if (eth0BandwidthHistory.length === 0) {
+      setEthernetBandwidthChartData(null);
+      return;
+    }
 
-    return {
+    setEthernetBandwidthChartData({
       labels: eth0BandwidthHistory.map(entry => {
         const date = new Date(entry.time);
         return date.toLocaleTimeString();
@@ -429,23 +448,18 @@ export default function Dashboard() {
           backgroundColor: "rgba(54, 162, 235, 0.2)",
           fill: true,
         },
-      ],
-      options: {
-        scales: {
-          y: {
-            beginAtZero: true,
-            min: 0
-          }
-        }
-      }
-    };
+      ]
+    });
   }, [eth0BandwidthHistory]);
 
   // WiFi bandwidth chart data
-  const wifiBandwidthChartData = useMemo(() => {
-    if (wifiBandwidthHistory.length === 0) return null;
+  useEffect(() => {
+    if (wifiBandwidthHistory.length === 0) {
+      setWifiBandwidthChartData(null);
+      return;
+    }
 
-    return {
+    setWifiBandwidthChartData({
       labels: wifiBandwidthHistory.map(entry => {
         const date = new Date(entry.time);
         return date.toLocaleTimeString();
@@ -465,16 +479,8 @@ export default function Dashboard() {
           backgroundColor: "rgba(54, 162, 235, 0.2)",
           fill: true,
         },
-      ],
-      options: {
-        scales: {
-          y: {
-            beginAtZero: true,
-            min: 0
-          }
-        }
-      }
-    };
+      ]
+    });
   }, [wifiBandwidthHistory]);
 
   // Parse connected devices info
@@ -694,117 +700,84 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Ethernet Bandwidth Usage */}
-          <Card className="col-span-2">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>Ethernet Bandwidth ({selectedInterfaces.ethernet})</CardTitle>
-                <button 
-                  onClick={() => refetch()}
-                  className="refresh-button"
-                  aria-label="Refresh bandwidth data"
-                >
-                  <RefreshCw size={16} />
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Bandwidth Rates */}
-                <div className="flex justify-between items-center">
-                  <div>
-                    {networkInterfaces.find(iface => iface.name === selectedInterfaces.ethernet) && (
-                      <>
-                        <p>
-                          <strong>Upload Rate:</strong> {eth0BandwidthHistory.length > 0 
-                            ? formatBandwidth(eth0BandwidthHistory[eth0BandwidthHistory.length - 1].uploadRate.toString()) 
-                            : "0 Mbps"}
-                        </p>
-                        <p>
-                          <strong>Download Rate:</strong> {eth0BandwidthHistory.length > 0 
-                            ? formatBandwidth(eth0BandwidthHistory[eth0BandwidthHistory.length - 1].downloadRate.toString()) 
-                            : "0 Mbps"}
-                        </p>
-                      </>
+          {/* Bandwidth Usage Section */}
+          <div className="col-span-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Ethernet Bandwidth Card */}
+            <Card className="shadow-md"> 
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center">
+                  <Network className="mr-2 h-5 w-5" /> Ethernet Bandwidth
+                </CardTitle>
+                <CardDescription>Download/Upload rates in Mbps</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px]">
+                  <Suspense fallback={<div className="flex items-center justify-center h-full">Loading chart...</div>}>
+                    {ethernetBandwidthChartData ? (
+                      <MemoizedLine
+                        data={ethernetBandwidthChartData}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: 'Mbps'
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        No data available
+                      </div>
                     )}
-                  </div>
+                  </Suspense>
                 </div>
+              </CardContent>
+            </Card>
 
-                {/* Bandwidth Chart */}
-                <Suspense fallback={<p>Loading chart...</p>}>
-                  {eth0BandwidthChartData && <MemoizedLine 
-                    data={eth0BandwidthChartData} 
-                    options={{
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          min: 0
-                        }
-                      },
-                      responsive: true,
-                      maintainAspectRatio: true
-                    }}
-                  />}
-                </Suspense>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* WiFi Bandwidth Usage */}
-          <Card className="col-span-2">
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <CardTitle>WiFi Bandwidth ({selectedInterfaces.wifi})</CardTitle>
-                <button 
-                  onClick={() => refetch()}
-                  className="refresh-button"
-                  aria-label="Refresh bandwidth data"
-                >
-                  <RefreshCw size={16} />
-                </button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Bandwidth Rates */}
-                <div className="flex justify-between items-center">
-                  <div>
-                    {networkInterfaces.find(iface => iface.name === selectedInterfaces.wifi) && (
-                      <>
-                        <p>
-                          <strong>Upload Rate:</strong> {wifiBandwidthHistory.length > 0 
-                            ? formatBandwidth(wifiBandwidthHistory[wifiBandwidthHistory.length - 1].uploadRate.toString()) 
-                            : "0 Mbps"}
-                        </p>
-                        <p>
-                          <strong>Download Rate:</strong> {wifiBandwidthHistory.length > 0 
-                            ? formatBandwidth(wifiBandwidthHistory[wifiBandwidthHistory.length - 1].downloadRate.toString()) 
-                            : "0 Mbps"}
-                        </p>
-                      </>
+            {/* WiFi Bandwidth Card */}
+            <Card className="shadow-md">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center">
+                  <Wifi className="mr-2 h-5 w-5" /> WiFi Bandwidth
+                </CardTitle>
+                <CardDescription>Download/Upload rates in Mbps</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[200px]">
+                  <Suspense fallback={<div className="flex items-center justify-center h-full">Loading chart...</div>}>
+                    {wifiBandwidthChartData ? (
+                      <MemoizedLine
+                        data={wifiBandwidthChartData}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              title: {
+                                display: true,
+                                text: 'Mbps'
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        No data available
+                      </div>
                     )}
-                  </div>
+                  </Suspense>
                 </div>
-
-                {/* Bandwidth Chart */}
-                <Suspense fallback={<p>Loading chart...</p>}>
-                  {wifiBandwidthChartData && <MemoizedLine 
-                    data={wifiBandwidthChartData} 
-                    options={{
-                      scales: {
-                        y: {
-                          beginAtZero: true,
-                          min: 0
-                        }
-                      },
-                      responsive: true,
-                      maintainAspectRatio: true
-                    }}
-                  />}
-                </Suspense>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Connected Devices */}
           <Card className="col-span-4">

@@ -4,8 +4,14 @@ export interface DashboardData {
   memoryInfo?: string;
   loadaverageInfo?: string;
   bandwidthInfo?: {
-    txRate?: string;
-    rxRate?: string;
+    ethernet: {
+      txRate?: string;
+      rxRate?: string;
+    };
+    wifi: {
+      txRate?: string;
+      rxRate?: string;
+    };
   };
   firewallStatus?: {
     status: boolean;

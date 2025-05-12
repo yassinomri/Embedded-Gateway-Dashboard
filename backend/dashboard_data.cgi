@@ -8,27 +8,44 @@ echo
 # Retrieve memory usage
 memory_info=$(cat /proc/meminfo 2>/dev/null || echo "N/A")
 
-# Retrieve bandwidth usage for br-lan
+# Retrieve RX/TX statistics for eth0 and phy0-ap0
 BC="/usr/bin/bc"
-tx_rate=""
-rx_rate=""
-INTERFACE="br-lan"
-# Get initial RX/TX bytes
-RX1=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
-TX1=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
-sleep 5  # Increase sleep interval to 5 seconds
-# Get final RX/TX bytes
-RX2=$(cat /sys/class/net/$INTERFACE/statistics/rx_bytes 2>/dev/null || echo "0")
-TX2=$(cat /sys/class/net/$INTERFACE/statistics/tx_bytes 2>/dev/null || echo "0")
-# Debugging
-echo "DEBUG: RX1=$RX1, RX2=$RX2, TX1=$TX1, TX2=$TX2" >&2
-# Calculate rates in Mbps using bc
-RX_DIFF=$(echo "$RX2 - $RX1" | $BC)
-TX_DIFF=$(echo "$TX2 - $TX1" | $BC)
-RX_RATE=$(echo "scale=4; (($RX2 - $RX1) * 8) / (1000000 * 5)" | $BC)
-TX_RATE=$(echo "scale=4; (($TX2 - $TX1) * 8) / (1000000 * 5)" | $BC)
-rx_rate=$RX_RATE
-tx_rate=$TX_RATE
+eth0_tx_rate=""
+eth0_rx_rate=""
+wifi_tx_rate=""
+wifi_rx_rate=""
+
+# Calculate rates for eth0
+if [ -d "/sys/class/net/eth0/statistics" ]; then
+  # Get initial RX/TX bytes
+  ETH0_RX1=$(cat /sys/class/net/eth0/statistics/rx_bytes 2>/dev/null || echo "0")
+  ETH0_TX1=$(cat /sys/class/net/eth0/statistics/tx_bytes 2>/dev/null || echo "0")
+  sleep 5
+  # Get final RX/TX bytes
+  ETH0_RX2=$(cat /sys/class/net/eth0/statistics/rx_bytes 2>/dev/null || echo "0")
+  ETH0_TX2=$(cat /sys/class/net/eth0/statistics/tx_bytes 2>/dev/null || echo "0")
+  # Calculate rates in Mbps
+  ETH0_RX_RATE=$(echo "scale=4; (($ETH0_RX2 - $ETH0_RX1) * 8) / (1000000 * 2)" | $BC)
+  ETH0_TX_RATE=$(echo "scale=4; (($ETH0_TX2 - $ETH0_TX1) * 8) / (1000000 * 2)" | $BC)
+  eth0_rx_rate=$ETH0_RX_RATE
+  eth0_tx_rate=$ETH0_TX_RATE
+fi
+
+# Calculate rates for phy0-ap0 (WiFi)
+if [ -d "/sys/class/net/phy0-ap0/statistics" ]; then
+  # Get initial RX/TX bytes
+  WIFI_RX1=$(cat /sys/class/net/phy0-ap0/statistics/rx_bytes 2>/dev/null || echo "0")
+  WIFI_TX1=$(cat /sys/class/net/phy0-ap0/statistics/tx_bytes 2>/dev/null || echo "0")
+  sleep 5
+  # Get final RX/TX bytes
+  WIFI_RX2=$(cat /sys/class/net/phy0-ap0/statistics/rx_bytes 2>/dev/null || echo "0")
+  WIFI_TX2=$(cat /sys/class/net/phy0-ap0/statistics/tx_bytes 2>/dev/null || echo "0")
+  # Calculate rates in Mbps
+  WIFI_RX_RATE=$(echo "scale=4; (($WIFI_RX2 - $WIFI_RX1) * 8) / (1000000 * 2)" | $BC)
+  WIFI_TX_RATE=$(echo "scale=4; (($WIFI_TX2 - $WIFI_TX1) * 8) / (1000000 * 2)" | $BC)
+  wifi_rx_rate=$WIFI_RX_RATE
+  wifi_tx_rate=$WIFI_TX_RATE
+fi
 
 # Retrieve active connections using netstat
 active_connections_info=$(netstat -tulnp 2>/dev/null || echo "No active connections found")
@@ -214,8 +231,14 @@ cat <<EOF
 {
   "memoryInfo": "$(json_escape "$memory_info")",
   "bandwidthInfo": {
-    "txRate": "$tx_rate",
-    "rxRate": "$rx_rate"
+    "ethernet": {
+      "txRate": "$eth0_tx_rate",
+      "rxRate": "$eth0_rx_rate"
+    },
+    "wifi": {
+      "txRate": "$wifi_tx_rate",
+      "rxRate": "$wifi_rx_rate"
+    }
   },
   "activeConnectionsInfo": "$(json_escape "$active_connections_info")",
   "connectedDevicesInfo": {

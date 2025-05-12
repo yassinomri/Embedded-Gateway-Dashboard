@@ -9,15 +9,24 @@ export interface HistoryEntry {
   downloadRate: number; // Download rate in Mbps
 }
 
+interface BandwidthEntry {
+  time: string;
+  download: number;
+  upload: number;
+  type: string; // 'ethernet' or 'wifi'
+}
+
 class PerformanceDB extends Dexie {
   performanceData!: Table<HistoryEntry & { id?: number }>;
   settings!: Table<{ key: string; value: string }>;
+  bandwidthData!: Table<BandwidthEntry & { id?: number }>;
 
   constructor() {
     super('PerformanceDB');
     this.version(2).stores({
       performanceData: '++id, time, latency, packetLoss, throughput, uploadRate, downloadRate',
       settings: 'key',
+      bandwidthData: '++id, time, type'
     });
   }
 }
@@ -88,42 +97,47 @@ export const getTargetIp = async (): Promise<string | null> => {
   }
 };
 
-export const saveBandwidthData = async (bandwidth: {
-  uploadRate: number;
-  downloadRate: number;
-}) => {
+export const saveBandwidthData = async (type: string, data: Omit<BandwidthEntry, 'type'>) => {
   try {
-    const entry: HistoryEntry = {
-      time: new Date().toISOString(),
-      latency: 0, // Default value for latency
-      packetLoss: 0, // Default value for packet loss
-      throughput: 0, // Default value for throughput
-      uploadRate: bandwidth.uploadRate,
-      downloadRate: bandwidth.downloadRate,
-    };
-    await db.performanceData.add(entry);
+    await db.bandwidthData.add({
+      ...data,
+      type
+    });
+    
+    // Clean up old data (keep last 100 entries per type)
+    const count = await db.bandwidthData.where('type').equals(type).count();
+    if (count > 100) {
+      const oldestToKeep = await db.bandwidthData
+        .where('type')
+        .equals(type)
+        .sortBy('time')
+        .then(items => items[count - 100].time);
+      
+      await db.bandwidthData
+        .where('type')
+        .equals(type)
+        .and(item => item.time < oldestToKeep)
+        .delete();
+    }
   } catch (error) {
-    console.error('Error saving bandwidth data to IndexedDB:', error);
+    console.error(`Error saving ${type} bandwidth data:`, error);
   }
 };
 
-export const getBandwidthData = async (limit: number = 50): Promise<
-  { time: string; uploadRate: number; downloadRate: number }[]
-> => {
+export const getBandwidthData = async (type: string, limit: number = 20): Promise<Omit<BandwidthEntry, 'type'>[]> => {
   try {
-    const data = await db.performanceData
-      .orderBy('time')
-      .reverse()
-      .limit(limit)
-      .toArray();
-
-    return data.map(entry => ({
-      time: entry.time,
-      uploadRate: entry.uploadRate || 0,
-      downloadRate: entry.downloadRate || 0,
-    }));
+    return await db.bandwidthData
+      .where('type')
+      .equals(type)
+      .sortBy('time')
+      .then(items => {
+        // Get the last 'limit' items
+        const result = items.slice(-limit);
+        // Return without the 'type' field
+        return result.map(({ time, download, upload }) => ({ time, download, upload }));
+      });
   } catch (error) {
-    console.error('Error fetching bandwidth data from IndexedDB:', error);
+    console.error(`Error fetching ${type} bandwidth data:`, error);
     return [];
   }
 };
