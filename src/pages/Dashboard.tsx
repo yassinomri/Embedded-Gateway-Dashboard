@@ -4,7 +4,17 @@ import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
 import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
-import { PowerIcon, WifiOff, RefreshCw, Network, Wifi } from "lucide-react";
+import { 
+  RefreshCw, 
+  WifiOff, 
+  PowerIcon, 
+  Network, 
+  Wifi, 
+  Shield, 
+  Server, 
+  Activity, 
+  Smartphone 
+} from "lucide-react";
 import { SyncManager } from "@/components/SyncManager";
 import {
   Chart as ChartJS,
@@ -575,7 +585,11 @@ export default function Dashboard() {
           <Card className="col-span-2">
             <CardHeader>
               <div className="flex items-center space-x-2">
-                <CardTitle>System Status</CardTitle>
+                <CardTitle>
+                  <div className="flex items-center">
+                    <Server className="mr-2 h-5 w-5" /> System Status
+                  </div>
+                </CardTitle>
               </div>
               <CardDescription></CardDescription>
             </CardHeader>
@@ -660,7 +674,11 @@ export default function Dashboard() {
           {/* Firewall Status */}
           <Card className="col-span-2">
             <CardHeader>
-              <CardTitle>Firewall</CardTitle>
+              <CardTitle>
+                <div className="flex items-center">
+                  <Shield className="mr-2 h-5 w-5" /> Firewall
+                </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -705,7 +723,11 @@ export default function Dashboard() {
           {/* Bandwidth Usage Section */}
           <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>Download/Upload rates in Mbps</CardTitle>
+              <CardTitle>
+                <div className="flex items-center">
+                  <Activity className="mr-2 h-5 w-5" /> Download/Upload rates in Mbps
+                </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -833,7 +855,11 @@ export default function Dashboard() {
           {/* Connected Devices */}
           <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>Connected Devices</CardTitle>
+              <CardTitle>
+                <div className="flex items-center">
+                  <Smartphone className="mr-2 h-5 w-5" /> Connected Devices
+                </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {connectedDevices && connectedDevices.length > 0 ? (
@@ -868,7 +894,11 @@ export default function Dashboard() {
                 {/* Network Interfaces Section */}
           <Card className="col-span-4">
             <CardHeader>
-              <CardTitle>Network Interfaces</CardTitle>
+              <CardTitle>
+                <div className="flex items-center">
+                  <Network className="mr-2 h-5 w-5" /> Network Interfaces
+                </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {networkInterfaces.length > 0 ? (
