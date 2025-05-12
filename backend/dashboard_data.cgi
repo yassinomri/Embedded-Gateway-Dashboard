@@ -53,22 +53,78 @@ active_rules=$(uci show firewall | grep "^firewall.@rule\[[0-9]\+\]=" | while re
   fi
 done | wc -l 2>/dev/null || echo "0")
 
-# Retrieve connected devices (example: DHCP leases)
-connected_devices_info=$(cat /tmp/dhcp.leases 2>/dev/null || echo "No DHCP leases found")
-
-# Format connected devices to be more readable
-formatted_devices=""
-while read -r line; do
-  if [ -n "$line" ]; then
-    timestamp=$(echo "$line" | awk '{print $1}')
-    mac=$(echo "$line" | awk '{print $2}')
-    ip=$(echo "$line" | awk '{print $3}')
-    hostname=$(echo "$line" | awk '{print $4}')
-    formatted_devices="${formatted_devices}${timestamp} ${mac} ${ip} ${hostname}\n"
+# Retrieve connected devices with connection type (WiFi/Ethernet)
+collect_connected_devices_info() {
+  # Get DHCP leases
+  local dhcp_leases=$(cat /tmp/dhcp.leases 2>/dev/null || echo "")
+  
+  # Collect WiFi MACs for all wireless interfaces
+  local wifi_macs=""
+  
+  # Get MAC addresses from the specific wireless interface phy0-ap0
+  local wifi_stations=$(iw dev phy0-ap0 station dump 2>/dev/null || echo "")
+  if [ -n "$wifi_stations" ]; then
+    wifi_macs=$(echo "$wifi_stations" | grep Station | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
   fi
-done <<EOF
-$connected_devices_info
+  
+  # Also try alternative command if the above didn't work
+  if [ -z "$wifi_macs" ]; then
+    wifi_macs=$(iwinfo phy0-ap0 assoclist 2>/dev/null | grep -o -E '([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}' | tr '[:upper:]' '[:lower:]')
+  fi
+  
+  # Debug output
+  echo "DEBUG: WiFi MACs found: $wifi_macs" >&2
+  
+  # Start JSON array
+  echo "["
+  
+  # Flag to track if we need to add a comma
+  local first=true
+  
+  # Process each line in dhcp leases
+  while read -r line; do
+    if [ -n "$line" ]; then
+      timestamp=$(echo "$line" | awk '{print $1}')
+      mac=$(echo "$line" | awk '{print $2}' | tr '[:upper:]' '[:lower:]')
+      ip=$(echo "$line" | awk '{print $3}')
+      hostname=$(echo "$line" | awk '{print $4}')
+      
+      # Initialize connection type as Ethernet by default
+      connection_type="Ethernet"
+      
+      # Check if MAC is in the WiFi MACs list
+      for wifi_mac in $wifi_macs; do
+        if [ "$mac" = "$wifi_mac" ]; then
+          connection_type="WiFi"
+          break
+        fi
+      done
+      
+      # Add comma if not the first entry
+      if [ "$first" = true ]; then
+        first=false
+      else
+        echo ","
+      fi
+      
+      # Output JSON object for this device
+      echo "    {"
+      echo "      \"ip\": \"$ip\","
+      echo "      \"mac\": \"$mac\","
+      echo "      \"hostname\": \"$hostname\","
+      echo "      \"connectionType\": \"$connection_type\""
+      echo "    }"
+    fi
+  done <<EOF
+$dhcp_leases
 EOF
+  
+  # Close JSON array
+  echo "]"
+}
+
+# Get connected devices in JSON format
+connected_devices_json=$(collect_connected_devices_info)
 
 # Retrieve loadaverage
 loadaverage_info=$(cat /proc/loadavg 2>/dev/null || echo "N/A")
@@ -162,7 +218,9 @@ cat <<EOF
     "rxRate": "$rx_rate"
   },
   "activeConnectionsInfo": "$(json_escape "$active_connections_info")",
-  "connectedDevicesInfo": "$(json_escape "$formatted_devices")",
+  "connectedDevicesInfo": {
+    "devices": $connected_devices_json
+  },
   "loadaverageInfo": "$(json_escape "$loadaverage_info")",
   "firewallStatus": {
     "status": $firewall_enabled,

@@ -479,24 +479,12 @@ export default function Dashboard() {
 
   // Parse connected devices info
   const connectedDevices = useMemo(() => {
-    if (!dashboardData?.connectedDevicesInfo) return [];
-  
-    return dashboardData.connectedDevicesInfo
-      .toString()
-      .split(/\r?\n/) // Handle both \n and \r\n line separators
-      .filter((line) => line.trim() !== "") // Remove empty lines
-      .map((line) => {
-        const parts = line.split(/\s+/); // Split by whitespace
-        const timestamp = parts[0] || "N/A";
-        const mac = parts[1] || "N/A";
-        const ip = parts[2] || "N/A";
-        const hostname = parts.slice(3).join(" ") || "N/A"; // Handle hostnames with spaces
-        return { timestamp, mac, ip, hostname };
-      });
-  }, [dashboardData?.connectedDevicesInfo]);
+    if (!dashboardData?.connectedDevicesInfo?.devices) return [];
+    return dashboardData.connectedDevicesInfo.devices;
+  }, [dashboardData?.connectedDevicesInfo?.devices]);
 
   useEffect(() => {
-    console.log("Parsed Connected Devices:", connectedDevices);
+    console.log("Connected Devices:", connectedDevices);
   }, [connectedDevices]);
 
   // Parse active connections info
@@ -818,8 +806,8 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-                    {/* Connected Devices */}
-          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+          {/* Connected Devices */}
+          <Card className="col-span-4">
             <CardHeader>
               <CardTitle>Connected Devices</CardTitle>
             </CardHeader>
@@ -831,6 +819,7 @@ export default function Dashboard() {
                       <th className="px-4 py-2 text-left">IP Address</th>
                       <th className="px-4 py-2 text-left">MAC Address</th>
                       <th className="px-4 py-2 text-left">Hostname</th>
+                      <th className="px-4 py-2 text-left">Type</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -839,6 +828,7 @@ export default function Dashboard() {
                         <td className="px-4 py-2">{device.ip}</td>
                         <td className="px-4 py-2">{device.mac}</td>
                         <td className="px-4 py-2">{device.hostname || "N/A"}</td>
+                        <td className="px-4 py-2">{device.connectionType}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -940,6 +930,12 @@ export default function Dashboard() {
     </div>
   );
 };
+
+
+
+
+
+
 
 
 
