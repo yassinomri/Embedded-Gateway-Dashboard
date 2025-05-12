@@ -43,6 +43,14 @@ const TableSkeleton = () => (
   </div>
 );
 
+// Add interface for bandwidth history by interface
+interface InterfaceBandwidthHistory {
+  time: string;
+  uploadRate: number;
+  downloadRate: number;
+  interface: string;
+}
+
 export default function Dashboard() {
   // Use React Query for data fetching with caching
   const { 
@@ -73,24 +81,29 @@ export default function Dashboard() {
   // Rest of your state variables
   const [systemOnline, setSystemOnline] = useState(false);
   const [historicalData, setHistoricalData] = useState([]);
-  const [bandwidthHistory, setBandwidthHistory] = useState<{time: string; uploadRate: number; downloadRate: number}[]>([]);
+  const [eth0BandwidthHistory, setEth0BandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
+  const [wifiBandwidthHistory, setWifiBandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
+  const [selectedInterfaces, setSelectedInterfaces] = useState({
+    ethernet: "eth0",
+    wifi: "phy0-ap0"
+  });
   
   // Fetch bandwidth history only once on component mount
   useEffect(() => {
     let isMounted = true;
     
-    const fetchBandwidthHistory = async () => {
+    const fetchBandwidthHistory = async (data: { time: string; uploadRate: number; downloadRate: number; }[]) => {
       try {
         const data = await getBandwidthData(50);
         if (isMounted) {
-          setBandwidthHistory(data);
+          fetchBandwidthHistory(data);
         }
       } catch (error) {
         console.error("Error fetching bandwidth history:", error);
       }
     };
     
-    fetchBandwidthHistory();
+    fetchBandwidthHistory([]);
     
     // Set up polling with a cleanup function
     const intervalId = setInterval(() => {
@@ -273,55 +286,196 @@ export default function Dashboard() {
     };
   }, [cpuUsageData]);
 
-  // Parse bandwidth info
-  const bandwidthData = useMemo(() => {
-    if (!dashboardData?.bandwidthInfo) return { labels: [], uploadData: [], downloadData: [] };
-    
-    const bandwidthLines = dashboardData.bandwidthInfo
-      .toString()
-      .split("\n")
-      .filter((line) => line.trim() !== "");
-    
-    const uploadData: number[] = [];
-    const downloadData: number[] = [];
-    const labels: string[] = [];
+  // Function to calculate bandwidth rates from bytes
+  const calculateBandwidthRate = (bytesNow: number, bytesBefore: number, timeElapsedMs: number): number => {
+    if (!bytesNow || !bytesBefore || !timeElapsedMs) return 0;
+    // Convert bytes to bits and time to seconds, then to Mbps
+    return ((bytesNow - bytesBefore) * 8) / (timeElapsedMs / 1000) / 1000000;
+  };
+  
+  // Track previous values for interfaces to calculate rates
+  const [interfacePrevValues, setInterfacePrevValues] = useState<{[key: string]: {rxBytes: number, txBytes: number, timestamp: number}}>({});
+  
+    const networkInterfaces = useMemo(() => {
+    if (!dashboardData?.networkInfo) return [];
 
-    bandwidthLines.forEach((line, index) => {
-      const match = line.match(/Upload: (\d+\.?\d*) Mbps, Download: (\d+\.?\d*) Mbps/);
-      if (match) {
-        uploadData.push(parseFloat(match[1]));
-        downloadData.push(parseFloat(match[2]));
-        labels.push(`T-${index}`);
+    return Array.isArray(dashboardData.networkInfo) ? dashboardData.networkInfo.map((interfaceData: NetworkInterface) => ({
+      name: interfaceData.interface || "N/A",
+      mac: interfaceData.hwaddr || "N/A",
+      ipv4: interfaceData.inet || "N/A",
+      ipv6: interfaceData.inet6 || "N/A",
+      rxBytes: formatBytes(interfaceData.rx_bytes) || "0",
+      txBytes: formatBytes(interfaceData.tx_bytes) || "0",
+      rxPackets: formatBytes(interfaceData.rx_packets) || "0",
+      txPackets: formatBytes(interfaceData.tx_packets) || "0",
+      mtu: interfaceData.mtu || "N/A",
+    })) : [];
+  }, [dashboardData?.networkInfo]);
+  
+  // Update interface bandwidth history when network interfaces data changes
+  useEffect(() => {
+    if (!networkInterfaces || networkInterfaces.length === 0) return;
+    
+    const now = Date.now();
+    const eth0Interface = networkInterfaces.find(iface => iface.name === selectedInterfaces.ethernet);
+    const wifiInterface = networkInterfaces.find(iface => iface.name === selectedInterfaces.wifi);
+    
+    // Process ethernet interface
+    if (eth0Interface) {
+      const rxBytes = parseInt(eth0Interface.rxBytes.replace(/[^0-9]/g, ''), 10);
+      const txBytes = parseInt(eth0Interface.txBytes.replace(/[^0-9]/g, ''), 10);
+      
+      if (interfacePrevValues[selectedInterfaces.ethernet]) {
+        const prev = interfacePrevValues[selectedInterfaces.ethernet];
+        const timeElapsed = now - prev.timestamp;
+        
+        if (timeElapsed > 0) {
+          const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
+          const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
+          
+          // Only add new entry if rates are valid
+          if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
+            const newEntry: InterfaceBandwidthHistory = {
+              time: new Date().toISOString(),
+              downloadRate,
+              uploadRate,
+              interface: selectedInterfaces.ethernet
+            };
+            
+            setEth0BandwidthHistory(prev => {
+              const newHistory = [...prev, newEntry];
+              // Keep only the last 50 entries
+              return newHistory.slice(-50);
+            });
+          }
+        }
       }
-    });
+      
+      // Update previous values
+      setInterfacePrevValues(prev => ({
+        ...prev,
+        [selectedInterfaces.ethernet]: {
+          rxBytes,
+          txBytes,
+          timestamp: now
+        }
+      }));
+    }
+    
+    // Process WiFi interface
+    if (wifiInterface) {
+      const rxBytes = parseInt(wifiInterface.rxBytes.replace(/[^0-9]/g, ''), 10);
+      const txBytes = parseInt(wifiInterface.txBytes.replace(/[^0-9]/g, ''), 10);
+      
+      if (interfacePrevValues[selectedInterfaces.wifi]) {
+        const prev = interfacePrevValues[selectedInterfaces.wifi];
+        const timeElapsed = now - prev.timestamp;
+        
+        if (timeElapsed > 0) {
+          const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
+          const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
+          
+          // Only add new entry if rates are valid
+          if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
+            const newEntry: InterfaceBandwidthHistory = {
+              time: new Date().toISOString(),
+              downloadRate,
+              uploadRate,
+              interface: selectedInterfaces.wifi
+            };
+            
+            setWifiBandwidthHistory(prev => {
+              const newHistory = [...prev, newEntry];
+              // Keep only the last 50 entries
+              return newHistory.slice(-50);
+            });
+          }
+        }
+      }
+      
+      // Update previous values
+      setInterfacePrevValues(prev => ({
+        ...prev,
+        [selectedInterfaces.wifi]: {
+          rxBytes,
+          txBytes,
+          timestamp: now
+        }
+      }));
+    }
+  }, [interfacePrevValues, networkInterfaces, selectedInterfaces]);
 
-    return { labels, uploadData, downloadData };
-  }, [dashboardData?.bandwidthInfo]);
-
-  // Bandwidth chart data
-  const bandwidthChartData = useMemo(() => {
-    if (bandwidthHistory.length === 0) return null;
+  // Ethernet bandwidth chart data
+  const eth0BandwidthChartData = useMemo(() => {
+    if (eth0BandwidthHistory.length === 0) return null;
 
     return {
-      labels: bandwidthHistory.map(entry => entry.time), // Time labels
+      labels: eth0BandwidthHistory.map(entry => {
+        const date = new Date(entry.time);
+        return date.toLocaleTimeString();
+      }),
       datasets: [
         {
           label: "Upload Rate (Mbps)",
-          data: bandwidthHistory.map(entry => entry.uploadRate),
+          data: eth0BandwidthHistory.map(entry => entry.uploadRate),
           borderColor: "#FF6384",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           fill: true,
         },
         {
           label: "Download Rate (Mbps)",
-          data: bandwidthHistory.map(entry => entry.downloadRate),
+          data: eth0BandwidthHistory.map(entry => entry.downloadRate),
           borderColor: "#36A2EB",
           backgroundColor: "rgba(54, 162, 235, 0.2)",
           fill: true,
         },
       ],
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+            min: 0
+          }
+        }
+      }
     };
-  }, [bandwidthHistory]);
+  }, [eth0BandwidthHistory]);
+
+  // WiFi bandwidth chart data
+  const wifiBandwidthChartData = useMemo(() => {
+    if (wifiBandwidthHistory.length === 0) return null;
+
+    return {
+      labels: wifiBandwidthHistory.map(entry => {
+        const date = new Date(entry.time);
+        return date.toLocaleTimeString();
+      }),
+      datasets: [
+        {
+          label: "Upload Rate (Mbps)",
+          data: wifiBandwidthHistory.map(entry => entry.uploadRate),
+          borderColor: "#FF6384",
+          backgroundColor: "rgba(255, 99, 132, 0.2)",
+          fill: true,
+        },
+        {
+          label: "Download Rate (Mbps)",
+          data: wifiBandwidthHistory.map(entry => entry.downloadRate),
+          borderColor: "#36A2EB",
+          backgroundColor: "rgba(54, 162, 235, 0.2)",
+          fill: true,
+        },
+      ],
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true,
+            min: 0
+          }
+        }
+      }
+    };
+  }, [wifiBandwidthHistory]);
 
   // Parse connected devices info
   const connectedDevices = useMemo(() => {
@@ -366,21 +520,7 @@ export default function Dashboard() {
       });
   }, [dashboardData?.activeConnectionsInfo]);
 
-  const networkInterfaces = useMemo(() => {
-    if (!dashboardData?.networkInfo) return [];
 
-    return Array.isArray(dashboardData.networkInfo) ? dashboardData.networkInfo.map((interfaceData: NetworkInterface) => ({
-      name: interfaceData.interface || "N/A",
-      mac: interfaceData.hwaddr || "N/A",
-      ipv4: interfaceData.inet || "N/A",
-      ipv6: interfaceData.inet6 || "N/A",
-      rxBytes: formatBytes(interfaceData.rx_bytes) || "0",
-      txBytes: formatBytes(interfaceData.tx_bytes) || "0",
-      rxPackets: formatBytes(interfaceData.rx_packets) || "0",
-      txPackets: formatBytes(interfaceData.tx_packets) || "0",
-      mtu: interfaceData.mtu || "N/A",
-    })) : [];
-  }, [dashboardData?.networkInfo]);
 
 
   if (isLoading) return (
@@ -566,28 +706,113 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Bandwidth Usage */}
-          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
+          {/* Ethernet Bandwidth Usage */}
+          <Card className="col-span-2">
             <CardHeader>
-              <CardTitle>Bandwidth Usage</CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle>Ethernet Bandwidth ({selectedInterfaces.ethernet})</CardTitle>
+                <button 
+                  onClick={() => refetch()}
+                  className="refresh-button"
+                  aria-label="Refresh bandwidth data"
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {/* Bandwidth Rates */}
                 <div className="flex justify-between items-center">
                   <div>
-                    <p>
-                      <strong>Upload Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.txRate || "0")}
-                    </p>
-                    <p>
-                      <strong>Download Rate:</strong> {formatBandwidth(dashboardData?.bandwidthInfo.rxRate || "0")}
-                    </p>
+                    {networkInterfaces.find(iface => iface.name === selectedInterfaces.ethernet) && (
+                      <>
+                        <p>
+                          <strong>Upload Rate:</strong> {eth0BandwidthHistory.length > 0 
+                            ? formatBandwidth(eth0BandwidthHistory[eth0BandwidthHistory.length - 1].uploadRate.toString()) 
+                            : "0 Mbps"}
+                        </p>
+                        <p>
+                          <strong>Download Rate:</strong> {eth0BandwidthHistory.length > 0 
+                            ? formatBandwidth(eth0BandwidthHistory[eth0BandwidthHistory.length - 1].downloadRate.toString()) 
+                            : "0 Mbps"}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
 
                 {/* Bandwidth Chart */}
                 <Suspense fallback={<p>Loading chart...</p>}>
-                  {bandwidthChartData && <MemoizedLine data={bandwidthChartData} />}
+                  {eth0BandwidthChartData && <MemoizedLine 
+                    data={eth0BandwidthChartData} 
+                    options={{
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          min: 0
+                        }
+                      },
+                      responsive: true,
+                      maintainAspectRatio: true
+                    }}
+                  />}
+                </Suspense>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* WiFi Bandwidth Usage */}
+          <Card className="col-span-2">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>WiFi Bandwidth ({selectedInterfaces.wifi})</CardTitle>
+                <button 
+                  onClick={() => refetch()}
+                  className="refresh-button"
+                  aria-label="Refresh bandwidth data"
+                >
+                  <RefreshCw size={16} />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Bandwidth Rates */}
+                <div className="flex justify-between items-center">
+                  <div>
+                    {networkInterfaces.find(iface => iface.name === selectedInterfaces.wifi) && (
+                      <>
+                        <p>
+                          <strong>Upload Rate:</strong> {wifiBandwidthHistory.length > 0 
+                            ? formatBandwidth(wifiBandwidthHistory[wifiBandwidthHistory.length - 1].uploadRate.toString()) 
+                            : "0 Mbps"}
+                        </p>
+                        <p>
+                          <strong>Download Rate:</strong> {wifiBandwidthHistory.length > 0 
+                            ? formatBandwidth(wifiBandwidthHistory[wifiBandwidthHistory.length - 1].downloadRate.toString()) 
+                            : "0 Mbps"}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bandwidth Chart */}
+                <Suspense fallback={<p>Loading chart...</p>}>
+                  {wifiBandwidthChartData && <MemoizedLine 
+                    data={wifiBandwidthChartData} 
+                    options={{
+                      scales: {
+                        y: {
+                          beginAtZero: true,
+                          min: 0
+                        }
+                      },
+                      responsive: true,
+                      maintainAspectRatio: true
+                    }}
+                  />}
                 </Suspense>
               </div>
             </CardContent>
@@ -715,6 +940,16 @@ export default function Dashboard() {
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
+
 
 
 
