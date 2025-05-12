@@ -2,7 +2,7 @@ import { SystemInfo } from "@/types/system-info";
 
 export const apiClient = {
     getSystemInfo: async (): Promise<SystemInfo> => {
-        const url = "http://192.168.1.1/cgi-bin/system_info.cgi";
+        const url = "http://192.168.1.2/cgi-bin/system_info.cgi";
         const response = await fetch(url, {
         method: "GET",
         headers: {

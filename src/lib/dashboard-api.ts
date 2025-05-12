@@ -14,7 +14,7 @@ export const apiClient = {
             return dashboardDataCache.data;
         }
         
-        const url = "http://192.168.1.1/cgi-bin/dashboard_data.cgi";
+        const url = "http://192.168.1.2/cgi-bin/dashboard_data.cgi";
         const maxRetries = 2; // Reduce max retries
         let retryCount = 0;
         
@@ -68,7 +68,7 @@ export const apiClient = {
     // Add a method to update configuration with offline support
     updateConfig: async (endpoint: string, data: unknown): Promise<unknown> => {
         try {
-            const url = `http://192.168.1.1/cgi-bin/${endpoint}`;
+            const url = `http://192.168.1.2/cgi-bin/${endpoint}`;
             const response = await fetch(url, {
                 method: "POST",
                 headers: {

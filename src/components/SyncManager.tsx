@@ -14,7 +14,7 @@ export function SyncManager({ autoSync = false }) {
   // Check if system is online
   const checkOnlineStatus = async () => {
     try {
-      const response = await fetch("http://192.168.1.1/cgi-bin/ping.cgi", {
+      const response = await fetch("http://192.168.1.2/cgi-bin/ping.cgi", {
         signal: AbortSignal.timeout(3000)
       });
       setSystemOnline(response.ok);
@@ -55,7 +55,7 @@ export function SyncManager({ autoSync = false }) {
     for (let i = 0; i < configs.length; i++) {
       const config = configs[i];
       try {
-        const url = `http://192.168.1.1/cgi-bin/${config.endpoint}`;
+        const url = `http://192.168.1.2/cgi-bin/${config.endpoint}`;
         const response = await fetch(url, {
           method: config.method,
           headers: {

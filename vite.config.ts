@@ -5,12 +5,12 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
-  server: {
+  server: {7
     host: "::",
     port: 3000, // Changed from 8080 to avoid conflict with uhttpd
     proxy: {
       "/cgi-bin": {
-        target: "http://192.168.1.1",
+        target: "http://192.168.1.2",
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path, // Preserve /cgi-bin/network.cgi

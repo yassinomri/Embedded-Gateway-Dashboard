@@ -3,7 +3,7 @@ import { data } from "react-router-dom";
 
 export const apiClient = {
   getInterfaces: async (): Promise<NetworkData> => {
-    const url = "http://192.168.1.1/cgi-bin/network.cgi?option=get";
+    const url = "http://192.168.1.2/cgi-bin/network.cgi?option=get";
 
     console.log("getInterfaces Request:", { url, headers: { "Content-Type": "application/json" } });
 
@@ -55,7 +55,7 @@ export const apiClient = {
     id: string,
     data: { gateway: string }
   ): Promise<{ status: string; message: string }> => {
-    const url = "http://192.168.1.1/cgi-bin/network.cgi";
+    const url = "http://192.168.1.2/cgi-bin/network.cgi";
     console.log("updateInterface Request:", { url, id, data });
 
     const response = await fetch(url, {
@@ -89,7 +89,7 @@ export const apiClient = {
   },
 
   getWireless: async (): Promise<WirelessConfig> => {
-    const url = "http://192.168.1.1/cgi-bin/wireless.cgi?option=get";
+    const url = "http://192.168.1.2/cgi-bin/wireless.cgi?option=get";
     console.log("getWireless Request:", { url });
 
     const response = await fetch(url, {
@@ -137,7 +137,7 @@ export const apiClient = {
   },
 
   updateWireless: async (config: WirelessConfig): Promise<{ status: string; message: string }> => {
-    const url = "http://192.168.1.1/cgi-bin/wireless.cgi";
+    const url = "http://192.168.1.2/cgi-bin/wireless.cgi";
     console.log("updateWireless Request:", { url, config });
 
     // Validate SSID before sending
@@ -175,7 +175,7 @@ export const apiClient = {
 
   getDhcpDns: async (): Promise<DhcpDnsConfig> => {
 
-    const url = "http://192.168.1.1/cgi-bin/dhcp_dns.cgi?option=get"
+    const url = "http://192.168.1.2/cgi-bin/dhcp_dns.cgi?option=get"
     console.log("getDhcpDns Request:", { url, headers: { "Content-Type": "application/json" } });
 
     const response = await fetch(url, {
@@ -230,7 +230,7 @@ export const apiClient = {
   },
 
   updateDhcpDns: async (config: DhcpDnsConfig): Promise<void> => {
-    const url = "http://192.168.1.1/cgi-bin/dhcp_dns.cgi";
+    const url = "http://192.168.1.2/cgi-bin/dhcp_dns.cgi";
     console.log("updateDhcpDns Request:", { url, config });
     console.log("Updating DHCP & DNS config:", config);
 
@@ -269,7 +269,7 @@ export const apiClient = {
   },
 
   rebootSystem: async (): Promise<void> => {
-    const url = "http://192.168.1.1/cgi-bin/reboot.cgi";
+    const url = "http://192.168.1.2/cgi-bin/reboot.cgi";
     const response = await fetch(url, {
       method: "POST",
       headers: {

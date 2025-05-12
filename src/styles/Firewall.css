@@ -415,3 +415,20 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: #fff3cd;
+  border: 1px solid #ffeeba;
+  color: #856404;
+  padding: 10px 15px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.offline-banner svg {
+  flex-shrink: 0;
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Shield, Trash2, Plus, AlertTriangle, Edit2 } from 'lucide-react';
+import { Shield, Trash2, Plus, AlertTriangle, Edit2, WifiOff } from 'lucide-react';
 import { FirewallConfig, Rule} from '@/types/firewall';
 import { useToast } from '../hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -42,6 +42,7 @@ const Firewall: React.FC = () => {
   const [loading, setLoading] = usePersistedState<boolean>('firewallLoading', true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [updatePending, setUpdatePending] = useState(false);
+  const [isGatewayOnline, setIsGatewayOnline] = useState(true);
   const [newRule, setNewRule] = useState<Partial<Rule>>({
     name: '',
     src: 'any',
@@ -91,8 +92,10 @@ const Firewall: React.FC = () => {
     try {
       const response = await getFirewall();
       setConfig(response);
+      setIsGatewayOnline(true);
       sessionStorage.setItem('firewallConfig', JSON.stringify(response));
     } catch (error) {
+      setIsGatewayOnline(false);
       if (showToast) {
         toast({
           variant: 'destructive',
@@ -103,7 +106,7 @@ const Firewall: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast, setConfig, setLoading]); 
+  }, [toast, setConfig, setLoading]);
 
   useEffect(() => {
     // Check if we have cached data
@@ -171,15 +174,17 @@ const Firewall: React.FC = () => {
       }));
 
       try {
-        await debouncedUpdateFirewall({ 
+        const result = await updateFirewall({ 
           action: 'update', 
           enabled: config.enabled, 
           rules: [updatedRule] 
         });
+        
         toast({
-          title: 'Success',
-          description: 'Rule updated successfully',
+          title: result.status === 'success' ? 'Success' : 'Pending',
+          description: result.message,
         });
+        
         setIsModalOpen(false);
         setNewRule(initialRuleState);
         setEditingRule(null);
@@ -195,7 +200,7 @@ const Firewall: React.FC = () => {
         setUpdatePending(false);
       }
     } else {
-      // Add new rule (existing code)
+      // Add new rule
       const rule: Rule = {
         id: `temp-${Date.now()}`,
         name: newRule.name,
@@ -214,10 +219,10 @@ const Firewall: React.FC = () => {
       }));
 
       try {
-        await debouncedUpdateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
+        const result = await updateFirewall({ action: 'add', enabled: config.enabled, rules: [rule] });
         toast({
-          title: 'Success',
-          description: 'Rule added successfully',
+          title: result.status === 'success' ? 'Success' : 'Pending',
+          description: result.message,
         });
         setIsModalOpen(false);
         setNewRule(initialRuleState);
@@ -246,10 +251,10 @@ const Firewall: React.FC = () => {
     }));
 
     try {
-      await debouncedUpdateFirewall({ action: 'delete', id });
+      const result = await updateFirewall({ action: 'delete', id });
       toast({
-        title: 'Success',
-        description: 'Rule deleted successfully',
+        title: result.status === 'success' ? 'Success' : 'Pending',
+        description: result.message,
       });
     } catch (error) {
       // Revert on error
@@ -275,45 +280,55 @@ const Firewall: React.FC = () => {
     }, 300),
   [toast]);
 
- // Handle toggling firewall with debouncing
-const handleToggleFirewall = async () => {
-  const newEnabled = !config.enabled;
-  setUpdatePending(true);
-  
-  // Capture current config for potential rollback
-  const previousConfig = config;
-  
-  // Optimistic update to both state and cache
-  const newConfig = { ...config, enabled: newEnabled };
-  setConfig(newConfig);
-  sessionStorage.setItem('firewallConfig', JSON.stringify(newConfig));
-  
-  try {
-    await debouncedToggleHandler(newEnabled);
-    toast({
-      title: 'Success',
-      description: `Firewall ${newEnabled ? 'enabled' : 'disabled'} successfully`,
-    });
-  } catch (error) {
-    // Revert on error
-    setConfig(previousConfig);
-    sessionStorage.setItem('firewallConfig', JSON.stringify(previousConfig));
-    toast({
-      variant: 'destructive',
-      title: 'Error',
-      description: 'Failed to toggle firewall state',
-    });
-  } finally {
-    setUpdatePending(false);
-  }
-};
-
-// (Duplicate declaration removed)
+  // Handle toggling firewall with debouncing
+  const handleToggleFirewall = async () => {
+    const newEnabled = !config.enabled;
+    setUpdatePending(true);
+    
+    // Capture current config for potential rollback
+    const previousConfig = config;
+    
+    // Optimistic update to both state and cache
+    const newConfig = { ...config, enabled: newEnabled };
+    setConfig(newConfig);
+    sessionStorage.setItem('firewallConfig', JSON.stringify(newConfig));
+    
+    try {
+      const result = await updateFirewall({ action: 'update', enabled: newEnabled });
+      toast({
+        title: result.status === 'success' ? 'Success' : 'Pending',
+        description: result.message,
+      });
+    } catch (error) {
+      // Revert on error
+      setConfig(previousConfig);
+      sessionStorage.setItem('firewallConfig', JSON.stringify(previousConfig));
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to toggle firewall state',
+      });
+    } finally {
+      setUpdatePending(false);
+    }
+  };
 
   // Memoized target class getter
   const getTargetClass = useCallback((target: string) => {
     return `target-${target}`;
   }, []);
+
+  // Add an offline banner when gateway is offline
+  const OfflineBanner = () => {
+    if (isGatewayOnline) return null;
+    
+    return (
+      <div className="offline-banner">
+        <WifiOff size={20} />
+        <span>Gateway is offline. Changes will be applied when connection is restored.</span>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -345,7 +360,9 @@ const handleToggleFirewall = async () => {
           Firewall Rules
         </h1>
       </header>
-  
+      
+      <OfflineBanner />
+      
       <div className="firewall-header">
       <div className={`firewall-status ${config.enabled ? 'firewall-active' : 'firewall-inactive'}`}>
         <div className="status-indicator">
