@@ -102,18 +102,35 @@ export const subscribeToStatusChanges = (callback: StatusListener): () => void =
   };
 };
 
+// Add a function to force navigation refresh
+let forceNavigationRefresh: (() => void) | null = null;
+
+export const registerNavigationRefresher = (refreshFn: () => void) => {
+  forceNavigationRefresh = refreshFn;
+};
+
+export const unregisterNavigationRefresher = () => {
+  forceNavigationRefresh = null;
+};
+
 // Notify all listeners about status changes
 const notifyStatusListeners = () => {
+  // Notify all listeners about status changes
   statusListeners.forEach(listener => {
-    try {
-      listener(gatewayStatus);
-    } catch (error) {
-      console.error('Error in status listener:', error);
-    }
+    listener(gatewayStatus);
   });
-};
+  
+  // Force navigation refresh if registered
+  if (forceNavigationRefresh) {
+    setTimeout(forceNavigationRefresh, 50); // Small delay to ensure state updates first
+  }
+}
 
 // Initialize the status checker at app startup
 if (typeof window !== 'undefined') {
   startStatusChecker();
 }
+
+
+
+

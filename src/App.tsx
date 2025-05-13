@@ -8,6 +8,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useEffect } from "react";
 import { startStatusChecker } from "@/lib/status-checker";
+import { NavigationRefresher } from '@/components/NavigationRefresher';
 
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
@@ -35,6 +36,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+          <NavigationRefresher />
           <Routes>
             <Route path="/login" element={<Login />} />
             

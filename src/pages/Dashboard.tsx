@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, Suspense, memo } from "react";
+import React, { useEffect, useState, useMemo, Suspense, memo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
@@ -30,6 +30,8 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useQuery } from '@tanstack/react-query';
 import { startStatusChecker, getGatewayStatus, subscribeToStatusChanges } from "@/lib/status-checker";
+import { useNavigate, useLocation } from "react-router-dom";
+import { debounce } from "lodash";
 
 // Memoize chart components to prevent unnecessary re-renders
 const MemoizedDoughnut = memo(React.lazy(() => 
@@ -65,6 +67,9 @@ interface InterfaceBandwidthHistory {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
   // Start the background status checker when Dashboard mounts
   useEffect(() => {
     startStatusChecker();
@@ -80,12 +85,12 @@ export default function Dashboard() {
     const { online } = getGatewayStatus();
     setSystemOnline(online);
     
-    // Subscribe to status changes
+    // Subscribe to status changes - simplified to avoid navigation interference
     const unsubscribe = subscribeToStatusChanges((online) => {
       setSystemOnline(online);
+      // No navigation code here - let React Router handle it
     });
     
-    // Cleanup subscription on unmount
     return () => {
       unsubscribe();
     };
@@ -129,57 +134,109 @@ export default function Dashboard() {
   // Add these state variables for the bandwidth charts
   const [ethernetBandwidthChartData, setEthernetBandwidthChartData] = useState<ChartData<'line'> | null>(null);
   const [wifiBandwidthChartData, setWifiBandwidthChartData] = useState<ChartData<'line'> | null>(null);  
+  // Function to calculate bandwidth rates from bytes
+  const calculateBandwidthRate = useCallback((bytesNow: number, bytesBefore: number, timeElapsedMs: number): number => {
+    if (!bytesNow || !bytesBefore || !timeElapsedMs) return 0;
+    // Convert bytes to bits and time to seconds, then to Mbps
+    return ((bytesNow - bytesBefore) * 8) / (timeElapsedMs / 1000) / 1000000;
+  }, []);
+
   // Fetch bandwidth history only once on component mount
-  useEffect(() => {
-    let isMounted = true;
-    
-    const fetchBandwidthHistory = async () => {
-      try {
-        const ethernetData = await getBandwidthData("ethernet");
-        const wifiData = await getBandwidthData("wifi");
+  const updateBandwidthHistory = useMemo(
+    () =>
+      debounce((interfaces, prevValues, selected) => {
+        if (!interfaces || interfaces.length === 0) return;
         
-        if (isMounted) {
-          // Transform the data to match expected format
-          const transformedEthernetData = ethernetData.map(entry => ({
-            time: entry.time,
-            uploadRate: entry.upload,
-            downloadRate: entry.download,
-            interface: selectedInterfaces.ethernet
-          }));
+        const now = Date.now();
+        const eth0Interface = interfaces.find(iface => iface.name === selected.ethernet);
+        const wifiInterface = interfaces.find(iface => iface.name === selected.wifi);
+        
+        // Process ethernet interface
+        if (eth0Interface) {
+          const rxBytes = parseInt(eth0Interface.rxBytes.replace(/[^0-9]/g, ''), 10);
+          const txBytes = parseInt(eth0Interface.txBytes.replace(/[^0-9]/g, ''), 10);
           
-          const transformedWifiData = wifiData.map(entry => ({
-            time: entry.time,
-            uploadRate: entry.upload,
-            downloadRate: entry.download,
-            interface: selectedInterfaces.wifi
-          }));
+          if (prevValues[selected.ethernet]) {
+            const prev = prevValues[selected.ethernet];
+            const timeElapsed = now - prev.timestamp;
+            
+            if (timeElapsed > 0) {
+              const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
+              const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
+              
+              // Only add new entry if rates are valid
+              if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
+                const newEntry = {
+                  time: new Date().toISOString(),
+                  downloadRate,
+                  uploadRate,
+                  interface: selected.ethernet
+                };
+                
+                setEth0BandwidthHistory(prev => {
+                  const newHistory = [...prev, newEntry];
+                  // Keep only the last 50 entries
+                  return newHistory.slice(-50);
+                });
+              }
+            }
+          }
           
-          setEth0BandwidthHistory(transformedEthernetData);
-          setWifiBandwidthHistory(transformedWifiData);
+          // Update previous values
+          setInterfacePrevValues(prev => ({
+            ...prev,
+            [selected.ethernet]: {
+              rxBytes,
+              txBytes,
+              timestamp: now
+            }
+          }));
         }
-      } catch (error) {
-        console.error("Error fetching bandwidth history:", error);
-      }
-    };
-    
-    fetchBandwidthHistory();
-    
-    // Set up polling with a cleanup function, but only when online
-    let intervalId: number | null = null;
-    
-    if (systemOnline) {
-      intervalId = window.setInterval(() => {
-        refetch();
-      }, 10000); // Check every 10 seconds
-    }
-    
-    return () => {
-      isMounted = false;
-      if (intervalId !== null) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [refetch, selectedInterfaces.ethernet, selectedInterfaces.wifi, systemOnline]); // Add systemOnline as dependency
+        
+        // Process WiFi interface
+        if (wifiInterface) {
+          const rxBytes = parseInt(wifiInterface.rxBytes.replace(/[^0-9]/g, ''), 10);
+          const txBytes = parseInt(wifiInterface.txBytes.replace(/[^0-9]/g, ''), 10);
+          
+          if (prevValues[selected.wifi]) {
+            const prev = prevValues[selected.wifi];
+            const timeElapsed = now - prev.timestamp;
+            
+            if (timeElapsed > 0) {
+              const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
+              const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
+              
+              // Only add new entry if rates are valid
+              if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
+                const newEntry = {
+                  time: new Date().toISOString(),
+                  downloadRate,
+                  uploadRate,
+                  interface: selected.wifi
+                };
+                
+                setWifiBandwidthHistory(prev => {
+                  const newHistory = [...prev, newEntry];
+                  // Keep only the last 50 entries
+                  return newHistory.slice(-50);
+                });
+              }
+            }
+          }
+          
+          // Update previous values
+          setInterfacePrevValues(prev => ({
+            ...prev,
+            [selected.wifi]: {
+              rxBytes,
+              txBytes,
+              timestamp: now
+            }
+          }));
+        }
+      }, 500),
+    [calculateBandwidthRate]
+  );
 
   // Function to format memory values
   const formatMemory = (value: number): string => {
@@ -346,13 +403,6 @@ export default function Dashboard() {
     };
   }, [cpuUsageData]);
 
-  // Function to calculate bandwidth rates from bytes
-  const calculateBandwidthRate = (bytesNow: number, bytesBefore: number, timeElapsedMs: number): number => {
-    if (!bytesNow || !bytesBefore || !timeElapsedMs) return 0;
-    // Convert bytes to bits and time to seconds, then to Mbps
-    return ((bytesNow - bytesBefore) * 8) / (timeElapsedMs / 1000) / 1000000;
-  };
-  
   // Track previous values for interfaces to calculate rates
   const [interfacePrevValues, setInterfacePrevValues] = useState<{[key: string]: {rxBytes: number, txBytes: number, timestamp: number}}>({});
   
@@ -374,96 +424,8 @@ export default function Dashboard() {
   
   // Update interface bandwidth history when network interfaces data changes
   useEffect(() => {
-    if (!networkInterfaces || networkInterfaces.length === 0) return;
-    
-    const now = Date.now();
-    const eth0Interface = networkInterfaces.find(iface => iface.name === selectedInterfaces.ethernet);
-    const wifiInterface = networkInterfaces.find(iface => iface.name === selectedInterfaces.wifi);
-    
-    // Process ethernet interface
-    if (eth0Interface) {
-      const rxBytes = parseInt(eth0Interface.rxBytes.replace(/[^0-9]/g, ''), 10);
-      const txBytes = parseInt(eth0Interface.txBytes.replace(/[^0-9]/g, ''), 10);
-      
-      if (interfacePrevValues[selectedInterfaces.ethernet]) {
-        const prev = interfacePrevValues[selectedInterfaces.ethernet];
-        const timeElapsed = now - prev.timestamp;
-        
-        if (timeElapsed > 0) {
-          const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
-          const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
-          
-          // Only add new entry if rates are valid
-          if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
-            const newEntry: InterfaceBandwidthHistory = {
-              time: new Date().toISOString(),
-              downloadRate,
-              uploadRate,
-              interface: selectedInterfaces.ethernet
-            };
-            
-            setEth0BandwidthHistory(prev => {
-              const newHistory = [...prev, newEntry];
-              // Keep only the last 50 entries
-              return newHistory.slice(-50);
-            });
-          }
-        }
-      }
-      
-      // Update previous values
-      setInterfacePrevValues(prev => ({
-        ...prev,
-        [selectedInterfaces.ethernet]: {
-          rxBytes,
-          txBytes,
-          timestamp: now
-        }
-      }));
-    }
-    
-    // Process WiFi interface
-    if (wifiInterface) {
-      const rxBytes = parseInt(wifiInterface.rxBytes.replace(/[^0-9]/g, ''), 10);
-      const txBytes = parseInt(wifiInterface.txBytes.replace(/[^0-9]/g, ''), 10);
-      
-      if (interfacePrevValues[selectedInterfaces.wifi]) {
-        const prev = interfacePrevValues[selectedInterfaces.wifi];
-        const timeElapsed = now - prev.timestamp;
-        
-        if (timeElapsed > 0) {
-          const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
-          const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
-          
-          // Only add new entry if rates are valid
-          if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
-            const newEntry: InterfaceBandwidthHistory = {
-              time: new Date().toISOString(),
-              downloadRate,
-              uploadRate,
-              interface: selectedInterfaces.wifi
-            };
-            
-            setWifiBandwidthHistory(prev => {
-              const newHistory = [...prev, newEntry];
-              // Keep only the last 50 entries
-              return newHistory.slice(-50);
-            });
-          }
-        }
-      }
-      
-      // Update previous values
-      setInterfacePrevValues(prev => ({
-        ...prev,
-        [selectedInterfaces.wifi]: {
-          rxBytes,
-          txBytes,
-          timestamp: now
-        }
-      }));
-    }
-  }, [interfacePrevValues, networkInterfaces, selectedInterfaces]);
+    updateBandwidthHistory(networkInterfaces, interfacePrevValues, selectedInterfaces);
+  }, [networkInterfaces, interfacePrevValues, selectedInterfaces, updateBandwidthHistory]);
 
   // Ethernet bandwidth chart data
   useEffect(() => {
@@ -740,9 +702,7 @@ export default function Dashboard() {
                 {/* Go to Firewall Page Button */}
                 <div className="mt-4">
                   <Button
-                    onClick={() => {
-                      window.location.href = "/firewall";
-                    }}
+                    onClick={() => navigate("/firewall")}
                     className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                   >
                     Go to Firewall Page
@@ -1016,22 +976,3 @@ export default function Dashboard() {
     </div>
   );
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

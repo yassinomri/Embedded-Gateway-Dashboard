@@ -1,11 +1,29 @@
 
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/use-auth";
 import { MainSidebar } from "@/components/Sidebar";
 import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
+import { useEffect, useState } from "react";
+import { getGatewayStatus, subscribeToStatusChanges } from "@/lib/status-checker";
 
 export function ProtectedRoute() {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
+  const [key, setKey] = useState(0);
+  const [gatewayStatus, setGatewayStatus] = useState(getGatewayStatus().online);
+
+  // Force re-render when location or gateway status changes
+  useEffect(() => {
+    const unsubscribe = subscribeToStatusChanges((online) => {
+      if (online !== gatewayStatus) {
+        setGatewayStatus(online);
+        // Force re-render of the entire route
+        setKey(prev => prev + 1);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [gatewayStatus]);
 
   if (isLoading) {
     // Show loading state
@@ -26,7 +44,8 @@ export function ProtectedRoute() {
         <MainSidebar />
         <SidebarRail />
         <SidebarInset className="bg-background">
-          <Outlet />
+          {/* Use key to force re-render when location or gateway status changes */}
+          <Outlet key={`${key}-${location.pathname}`} />
         </SidebarInset>
       </div>
     </SidebarProvider>

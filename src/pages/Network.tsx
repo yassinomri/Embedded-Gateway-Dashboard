@@ -16,6 +16,7 @@ import { savePendingConfig } from "@/lib/offline-config";
 import { SyncManager } from "@/components/SyncManager";
 import { getPendingConfigs } from "@/lib/offline-config";
 import { getGatewayStatus, subscribeToStatusChanges } from "@/lib/status-checker";
+import { useNavigate } from "react-router-dom";
 
 // Utility functions
 function isValidIP(ip: string) {
@@ -34,6 +35,7 @@ const isValidLastOctet = (octet: string): boolean => {
 export default function Network() {
   const queryClient = useQueryClient();
   const FAILURE_THRESHOLD = 3;
+  const navigate = useNavigate();
 
   // Replace the existing gateway online state and checker with the global one
   const [isGatewayOnline, setIsGatewayOnline] = useState(false);
@@ -77,6 +79,9 @@ export default function Network() {
           });
         }
       }
+      
+      // Remove the problematic navigation code
+      // Don't force navigation here - let React Router handle it naturally
     });
     
     return () => {
@@ -1221,6 +1226,8 @@ export default function Network() {
     </div>
   );
 }
+
+
 
 
 
