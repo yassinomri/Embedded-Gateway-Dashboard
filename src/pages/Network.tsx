@@ -15,7 +15,7 @@ import "@/styles/Network.css";
 import { savePendingConfig } from "@/lib/offline-config";
 import { SyncManager } from "@/components/SyncManager";
 import { getPendingConfigs } from "@/lib/offline-config";
-import { getGatewayStatus } from "@/lib/status-checker";
+import { getGatewayStatus, subscribeToStatusChanges } from "@/lib/status-checker";
 
 // Utility functions
 function isValidIP(ip: string) {
@@ -53,16 +53,15 @@ export default function Network() {
     return networkRelatedConfigs.length > 0;
   }, []);
 
-  // Use the global status checker instead of our own implementation
+  // Use the global status checker with subscription
   useEffect(() => {
     // Initial check
     const { online } = getGatewayStatus();
     setIsGatewayOnline(online);
     checkPendingConfigs();
     
-    // Set up interval to check status and auto-sync if needed
-    const intervalId = setInterval(() => {
-      const { online } = getGatewayStatus();
+    // Subscribe to status changes
+    const unsubscribe = subscribeToStatusChanges((online) => {
       const wasOffline = !isGatewayOnline;
       setIsGatewayOnline(online);
       
@@ -78,9 +77,11 @@ export default function Network() {
           });
         }
       }
-    }, 2000); // Check every 2 seconds
+    });
     
-    return () => clearInterval(intervalId);
+    return () => {
+      unsubscribe();
+    };
   }, [isGatewayOnline, checkPendingConfigs, queryClient]);
 
   // Add state for password visibility
@@ -1161,5 +1162,6 @@ export default function Network() {
     </div>
   );
 }
+
 
 

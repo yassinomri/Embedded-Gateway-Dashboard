@@ -3,6 +3,10 @@ let gatewayStatus: boolean = false;
 let lastChecked: number = 0;
 const CHECK_INTERVAL = 5000; // 5 seconds
 
+// Add event system for status changes
+type StatusListener = (status: boolean) => void;
+const statusListeners: StatusListener[] = [];
+
 // Function to check if gateway is online
 const checkGatewayStatus = async (): Promise<boolean> => {
   try {
@@ -46,15 +50,28 @@ export const startStatusChecker = () => {
   if (checkerId !== null) return; // Already running
   
   checkerId = window.setInterval(async () => {
-    gatewayStatus = await checkGatewayStatus();
+    const newStatus = await checkGatewayStatus();
+    const statusChanged = newStatus !== gatewayStatus;
+    
+    gatewayStatus = newStatus;
     lastChecked = Date.now();
-    console.log(`Gateway status checked: ${gatewayStatus ? 'online' : 'offline'}`);
+    
+    // Log status changes
+    if (statusChanged) {
+      console.log(`Gateway status changed: ${gatewayStatus ? 'online' : 'offline'}`);
+      // Notify all listeners about the status change
+      notifyStatusListeners();
+    } else {
+      console.log(`Gateway status checked: ${gatewayStatus ? 'online' : 'offline'}`);
+    }
   }, CHECK_INTERVAL);
   
   // Initial check
   checkGatewayStatus().then(status => {
     gatewayStatus = status;
     lastChecked = Date.now();
+    // Notify listeners on initial status
+    notifyStatusListeners();
   });
 };
 
@@ -71,3 +88,32 @@ export const getGatewayStatus = (): { online: boolean, lastChecked: number } => 
     lastChecked
   };
 };
+
+// Add subscription system for status changes
+export const subscribeToStatusChanges = (callback: StatusListener): () => void => {
+  statusListeners.push(callback);
+  
+  // Return unsubscribe function
+  return () => {
+    const index = statusListeners.indexOf(callback);
+    if (index !== -1) {
+      statusListeners.splice(index, 1);
+    }
+  };
+};
+
+// Notify all listeners about status changes
+const notifyStatusListeners = () => {
+  statusListeners.forEach(listener => {
+    try {
+      listener(gatewayStatus);
+    } catch (error) {
+      console.error('Error in status listener:', error);
+    }
+  });
+};
+
+// Initialize the status checker at app startup
+if (typeof window !== 'undefined') {
+  startStatusChecker();
+}

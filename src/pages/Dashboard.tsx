@@ -29,7 +29,7 @@ import {
 } from "chart.js";
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useQuery } from '@tanstack/react-query';
-import { startStatusChecker, getGatewayStatus } from "@/lib/status-checker";
+import { startStatusChecker, getGatewayStatus, subscribeToStatusChanges } from "@/lib/status-checker";
 
 // Memoize chart components to prevent unnecessary re-renders
 const MemoizedDoughnut = memo(React.lazy(() => 
@@ -71,22 +71,24 @@ export default function Dashboard() {
     // No need to stop it on unmount as we want it to keep running in the background
   }, []);
 
-  // Replace the existing systemOnline state with this
+  // Replace the existing systemOnline state and useEffect with this
   const [systemOnline, setSystemOnline] = useState(false);
-  
-  // Check gateway status periodically
+
+  // Subscribe to gateway status changes
   useEffect(() => {
-    // Initial check
+    // Initial status
     const { online } = getGatewayStatus();
     setSystemOnline(online);
     
-    // Set up interval to check status from the background checker
-    const intervalId = setInterval(() => {
-      const { online } = getGatewayStatus();
+    // Subscribe to status changes
+    const unsubscribe = subscribeToStatusChanges((online) => {
       setSystemOnline(online);
-    }, 2000); // Check every 2 seconds (faster than the background checker)
+    });
     
-    return () => clearInterval(intervalId);
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Use React Query for data fetching with caching
