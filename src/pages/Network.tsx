@@ -1,21 +1,21 @@
-import { useMutation, useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/network-api";
-import { Network as NetworkIcon, Wifi, Database, WifiOff, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Network as NetworkIcon, Wifi, Database, WifiOff, Eye, EyeOff } from "lucide-react";
 import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import "@/styles/Network.css";
 import { savePendingConfig } from "@/lib/offline-config";
 import { SyncManager } from "@/components/SyncManager";
-import { getPendingConfigs, removePendingConfig } from "@/lib/offline-config";
+import { getPendingConfigs } from "@/lib/offline-config";
+import { getGatewayStatus } from "@/lib/status-checker";
 
 // Utility functions
 function isValidIP(ip: string) {
@@ -26,15 +26,6 @@ function isValidIP(ip: string) {
     });
 }
 
-function isValidSSID(ssid: string) {
-  return ssid.length > 0 && ssid.length <= 32;
-}
-
-function isValidPassword(password: string | undefined): boolean {
-  if (!password) return false;
-  return password.length >= 8 && password.length <= 63;
-}
-
 const isValidLastOctet = (octet: string): boolean => {
   const num = parseInt(octet, 10);
   return !isNaN(num) && num >= 0 && num <= 255;
@@ -42,77 +33,55 @@ const isValidLastOctet = (octet: string): boolean => {
 
 export default function Network() {
   const queryClient = useQueryClient();
+  const FAILURE_THRESHOLD = 3;
 
-  // Add a state to track if the gateway is online
+  // Replace the existing gateway online state and checker with the global one
   const [isGatewayOnline, setIsGatewayOnline] = useState(false);
-
-  // Add state for tracking consecutive failures
+  const [hasPendingChanges, setHasPendingChanges] = useState(false);
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
-  const FAILURE_THRESHOLD = 3; // Number of consecutive failures before marking as offline
 
-  // Function to check if gateway is online
-  const checkGatewayStatus = async () => {
-    try {
-      // Try multiple endpoints to determine if gateway is online
-      const endpoints = [
-        "http://192.168.1.2/cgi-bin/ping.cgi",
-        "http://192.168.1.2/cgi-bin/network.cgi?option=get",
-        "http://192.168.1.2/cgi-bin/wireless.cgi?option=get",
-        "http://192.168.1.2/cgi-bin/dhcp_dns.cgi?option=get"
-      ];
+  // Check for pending network-related configs
+  const checkPendingConfigs = useCallback(() => {
+    const pendingConfigs = getPendingConfigs();
+    const networkRelatedConfigs = pendingConfigs.filter(config => 
+      config.endpoint.includes('network.cgi') || 
+      config.endpoint.includes('wireless.cgi') || 
+      config.endpoint.includes('dhcp_dns.cgi')
+    );
+    
+    setHasPendingChanges(networkRelatedConfigs.length > 0);
+    return networkRelatedConfigs.length > 0;
+  }, []);
+
+  // Use the global status checker instead of our own implementation
+  useEffect(() => {
+    // Initial check
+    const { online } = getGatewayStatus();
+    setIsGatewayOnline(online);
+    checkPendingConfigs();
+    
+    // Set up interval to check status and auto-sync if needed
+    const intervalId = setInterval(() => {
+      const { online } = getGatewayStatus();
+      const wasOffline = !isGatewayOnline;
+      setIsGatewayOnline(online);
       
-      // Try each endpoint
-      for (const endpoint of endpoints) {
-        try {
-          const response = await fetch(endpoint, {
-            method: "GET",
-            signal: AbortSignal.timeout(5000),
-            cache: 'no-store'
+      // If we just came back online and have pending changes, trigger sync
+      if (online && wasOffline && checkPendingConfigs()) {
+        console.log("Gateway came back online with pending network changes, auto-syncing...");
+        // Use the global sync function
+        if (window.syncPendingConfigs) {
+          window.syncPendingConfigs().then(result => {
+            console.log("Auto-sync completed:", result);
+            // Refresh data after sync
+            queryClient.invalidateQueries({ queryKey: ["network"] });
           });
-          
-          if (response.ok) {
-            setConsecutiveFailures(0);
-            setIsGatewayOnline(true);
-            return true;
-          }
-        } catch (endpointError) {
-          console.log(`Endpoint ${endpoint} check failed, trying next...`);
         }
       }
-      
-      // If we get here, all endpoints failed
-      setConsecutiveFailures(prev => {
-        const newCount = prev + 1;
-        if (newCount >= FAILURE_THRESHOLD) {
-          setIsGatewayOnline(false);
-        }
-        return newCount;
-      });
-      return false;
-    } catch (error) {
-      setConsecutiveFailures(prev => {
-        const newCount = prev + 1;
-        if (newCount >= FAILURE_THRESHOLD) {
-          setIsGatewayOnline(false);
-        }
-        return newCount;
-      });
-      return false;
-    }
-  };
-
-  // Set up periodic checking
-  useEffect(() => {
-    // Check immediately on component mount
-    checkGatewayStatus();
-    
-    // Set up interval to check periodically
-    const intervalId = setInterval(() => {
-      checkGatewayStatus();
-    }, 10000); // Check every 10 seconds
+    }, 2000); // Check every 2 seconds
     
     return () => clearInterval(intervalId);
-  }, []);
+  }, [isGatewayOnline, checkPendingConfigs, queryClient]);
 
   // Add state for password visibility
   const [showPassword, setShowPassword] = useState(false);
@@ -135,7 +104,7 @@ export default function Network() {
         return data;
       } catch (error) {
         // Increment failure counter
-        setConsecutiveFailures(prev => {
+        setConsecutiveFailures((prev: number) => {
           const newCount = prev + 1;
           // Only set gateway offline after consecutive failures
           if (newCount >= FAILURE_THRESHOLD) {
@@ -169,7 +138,7 @@ export default function Network() {
         console.log("Wireless data fetched:", data);
         return data;
       } catch (error) {
-        setConsecutiveFailures(prev => {
+        setConsecutiveFailures((prev: number) => {
           const newCount = prev + 1;
           if (newCount >= FAILURE_THRESHOLD) {
             setIsGatewayOnline(false);
@@ -205,7 +174,7 @@ export default function Network() {
         return data;
       } catch (error) {
         // Increment failure counter
-        setConsecutiveFailures(prev => {
+        setConsecutiveFailures((prev: number) => {
           const newCount = prev + 1;
           // Only set gateway offline after consecutive failures
           if (newCount >= FAILURE_THRESHOLD) {
@@ -293,13 +262,26 @@ export default function Network() {
   const interfaceMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { gateway: string } }) => {
       try {
-        // Try to update online
+        // Check if we're online first
+        const { online } = getGatewayStatus();
+        
+        if (!online) {
+          // If offline, save for later
+          savePendingConfig(`network.cgi?interface=${id}`, "POST", { 
+            interface: id, 
+            gateway: data.gateway 
+          });
+          return { 
+            status: "pending", 
+            message: "Configuration saved and will be applied when the gateway is online" 
+          };
+        }
+        
+        // If online, try to update
         const response = await apiClient.updateInterface(id, { gateway: data.gateway });
-        setIsGatewayOnline(true);
         return response;
       } catch (error) {
-        // If offline, save for later
-        setIsGatewayOnline(false);
+        // If request fails, save for later
         savePendingConfig(`network.cgi?interface=${id}`, "POST", { 
           interface: id, 
           gateway: data.gateway 
@@ -314,8 +296,25 @@ export default function Network() {
       toast({
         title: response.status === "success" ? "Success" : "Pending",
         description: response.message,
-        variant: response.status === "success" ? "default" : "default",
       });
+      
+      // If it was a pending change, check if we should auto-sync
+      if (response.status === "pending") {
+        setHasPendingChanges(true);
+        
+        // If we're actually online now, try to sync immediately
+        const { online } = getGatewayStatus();
+        if (online && window.syncPendingConfigs) {
+          window.syncPendingConfigs().then(result => {
+            if (result.success > 0) {
+              queryClient.invalidateQueries({ queryKey: ["network"] });
+            }
+          });
+        }
+      } else {
+        // If it was successful, invalidate the query to refetch the data
+        queryClient.invalidateQueries({ queryKey: ["network", "interfaces"] });
+      }
     },
     onError: (error) => {
       toast({
@@ -330,11 +329,23 @@ export default function Network() {
   const wirelessMutation = useMutation({
     mutationFn: async (config: WirelessConfig) => {
       try {
+        // Check if we're online first
+        const { online } = getGatewayStatus();
+        
+        if (!online) {
+          // If offline, save for later
+          savePendingConfig("wireless.cgi", "POST", config);
+          return { 
+            status: "pending", 
+            message: "Wireless configuration saved and will be applied when the gateway is online" 
+          };
+        }
+        
+        // If online, try to update
         const response = await apiClient.updateWireless(config);
-        setIsGatewayOnline(true);
         return response;
       } catch (error) {
-        setIsGatewayOnline(false);
+        // If request fails, save for later
         savePendingConfig("wireless.cgi", "POST", config);
         return { 
           status: "pending", 
@@ -347,8 +358,24 @@ export default function Network() {
         title: response.status === "success" ? "Success" : "Pending",
         description: response.message,
       });
-      // Invalidate the wireless query to refetch the data
-      queryClient.invalidateQueries({ queryKey: ["network", "wireless"] });
+      
+      // If it was a pending change, check if we should auto-sync
+      if (response.status === "pending") {
+        setHasPendingChanges(true);
+        
+        // If we're actually online now, try to sync immediately
+        const { online } = getGatewayStatus();
+        if (online && window.syncPendingConfigs) {
+          window.syncPendingConfigs().then(result => {
+            if (result.success > 0) {
+              queryClient.invalidateQueries({ queryKey: ["network"] });
+            }
+          });
+        }
+      } else {
+        // If it was successful, invalidate the query to refetch the data
+        queryClient.invalidateQueries({ queryKey: ["network", "wireless"] });
+      }
     },
     onError: (error) => {
       toast({
@@ -363,11 +390,23 @@ export default function Network() {
   const dhcpDnsMutation = useMutation({
     mutationFn: async (config: DhcpDnsConfig) => {
       try {
+        // Check if we're online first
+        const { online } = getGatewayStatus();
+        
+        if (!online) {
+          // If offline, save for later
+          savePendingConfig("dhcp_dns.cgi", "POST", config);
+          return { 
+            status: "pending", 
+            message: "DHCP & DNS configuration saved and will be applied when the gateway is online" 
+          };
+        }
+        
+        // If online, try to update
         await apiClient.updateDhcpDns(config);
-        setIsGatewayOnline(true);
         return { status: "success", message: "DHCP & DNS configuration updated successfully" };
       } catch (error) {
-        setIsGatewayOnline(false);
+        // If request fails, save for later
         savePendingConfig("dhcp_dns.cgi", "POST", config);
         return { 
           status: "pending", 
@@ -380,6 +419,24 @@ export default function Network() {
         title: response.status === "success" ? "Success" : "Pending",
         description: response.message,
       });
+      
+      // If it was a pending change, check if we should auto-sync
+      if (response.status === "pending") {
+        setHasPendingChanges(true);
+        
+        // If we're actually online now, try to sync immediately
+        const { online } = getGatewayStatus();
+        if (online && window.syncPendingConfigs) {
+          window.syncPendingConfigs().then(result => {
+            if (result.success > 0) {
+              queryClient.invalidateQueries({ queryKey: ["network"] });
+            }
+          });
+        }
+      } else {
+        // If it was successful, invalidate the query to refetch the data
+        queryClient.invalidateQueries({ queryKey: ["network", "dhcp-dns"] });
+      }
     },
     onError: (error) => {
       toast({
@@ -667,7 +724,24 @@ export default function Network() {
 
   return (
     <div className="container mx-auto p-6">
-      <DebugComponent />
+      {/* Add SyncManager with autoSync enabled */}
+      <SyncManager 
+        autoSync={true} 
+        onSyncComplete={(result) => {
+          console.log("Network sync completed:", result);
+          if (result.success > 0) {
+            // Refresh data after successful sync
+            queryClient.invalidateQueries({ queryKey: ["network"] });
+            toast({
+              title: "Sync Complete",
+              description: `Successfully applied ${result.success} network configurations.${
+                result.failed > 0 ? ` Failed to apply ${result.failed} configurations.` : ''
+              }`,
+            });
+          }
+        }} 
+      />
+      
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Network Configuration</h1>
         {!isGatewayOnline && (
@@ -1087,50 +1161,5 @@ export default function Network() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

@@ -29,6 +29,7 @@ import {
 } from "chart.js";
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { useQuery } from '@tanstack/react-query';
+import { startStatusChecker, getGatewayStatus } from "@/lib/status-checker";
 
 // Memoize chart components to prevent unnecessary re-renders
 const MemoizedDoughnut = memo(React.lazy(() => 
@@ -64,9 +65,29 @@ interface InterfaceBandwidthHistory {
 }
 
 export default function Dashboard() {
-  // Add a more stable online detection mechanism
-  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
-  const FAILURE_THRESHOLD = 3; // Number of consecutive failures before marking as offline
+  // Start the background status checker when Dashboard mounts
+  useEffect(() => {
+    startStatusChecker();
+    // No need to stop it on unmount as we want it to keep running in the background
+  }, []);
+
+  // Replace the existing systemOnline state with this
+  const [systemOnline, setSystemOnline] = useState(false);
+  
+  // Check gateway status periodically
+  useEffect(() => {
+    // Initial check
+    const { online } = getGatewayStatus();
+    setSystemOnline(online);
+    
+    // Set up interval to check status from the background checker
+    const intervalId = setInterval(() => {
+      const { online } = getGatewayStatus();
+      setSystemOnline(online);
+    }, 2000); // Check every 2 seconds (faster than the background checker)
+    
+    return () => clearInterval(intervalId);
+  }, []);
 
   // Use React Query for data fetching with caching
   const { 
@@ -80,21 +101,9 @@ export default function Dashboard() {
       try {
         console.log("Fetching dashboard data...");
         const response = await apiClient.getDashboardData();
-        // Reset failure counter on success
-        setConsecutiveFailures(0);
-        setSystemOnline(true);
         return response;
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
-        // Increment failure counter
-        setConsecutiveFailures(prev => {
-          const newCount = prev + 1;
-          // Only set system offline after consecutive failures
-          if (newCount >= FAILURE_THRESHOLD) {
-            setSystemOnline(false);
-          }
-          return newCount;
-        });
         throw err;
       }
     },
@@ -102,10 +111,11 @@ export default function Dashboard() {
     gcTime: 5 * 60 * 1000, // Cache for 5 minutes
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
     retry: 1, // Only retry once on failure
+    // Only fetch if system is online
+    enabled: systemOnline,
   });
 
   // Rest of your state variables
-  const [systemOnline, setSystemOnline] = useState(false);
   const [historicalData, setHistoricalData] = useState([]);
   const [eth0BandwidthHistory, setEth0BandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
   const [wifiBandwidthHistory, setWifiBandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
@@ -152,16 +162,22 @@ export default function Dashboard() {
     
     fetchBandwidthHistory();
     
-    // Set up polling with a cleanup function
-    const intervalId = setInterval(() => {
-      refetch();
-    }, 10000); // Check every 10 seconds
+    // Set up polling with a cleanup function, but only when online
+    let intervalId: number | null = null;
+    
+    if (systemOnline) {
+      intervalId = window.setInterval(() => {
+        refetch();
+      }, 10000); // Check every 10 seconds
+    }
     
     return () => {
       isMounted = false;
-      clearInterval(intervalId);
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+      }
     };
-  }, [refetch, selectedInterfaces.ethernet, selectedInterfaces.wifi]);
+  }, [refetch, selectedInterfaces.ethernet, selectedInterfaces.wifi, systemOnline]); // Add systemOnline as dependency
 
   // Function to format memory values
   const formatMemory = (value: number): string => {

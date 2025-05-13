@@ -1,5 +1,6 @@
 import { DashboardData } from "@/types/dashboard-data";
 import { savePendingConfig } from "./offline-config";
+import { getGatewayStatus } from "./status-checker";
 
 // Add a cache for dashboard data
 let dashboardDataCache: { data: DashboardData; timestamp: number } | null = null;
@@ -14,6 +15,16 @@ export const apiClient = {
             return dashboardDataCache.data;
         }
         
+        // Check gateway status first
+        const { online } = getGatewayStatus();
+        if (!online) {
+            console.log("Gateway is offline, using cached data if available");
+            if (dashboardDataCache) {
+                return dashboardDataCache.data;
+            }
+            throw new Error("Gateway is offline and no cached data is available");
+        }
+        
         const url = "http://192.168.1.2/cgi-bin/dashboard_data.cgi";
         const maxRetries = 2;
         let retryCount = 0;
@@ -23,7 +34,7 @@ export const apiClient = {
           try {
             console.log(`Fetching dashboard data (attempt ${retryCount + 1})`);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // Increase timeout to 8 seconds
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
             
             const response = await fetch(url, {
               method: "GET",
@@ -31,7 +42,6 @@ export const apiClient = {
                 "Content-Type": "application/json",
               },
               signal: controller.signal,
-              // Add cache busting to prevent browser caching
               cache: 'no-store',
             });
             
@@ -70,8 +80,8 @@ export const apiClient = {
           }
         }
         
-        // This should never be reached due to the throw in the loop
-        throw lastError || new Error("Failed to fetch dashboard data");
+        // This should never be reached due to the throw in the loop above
+        throw lastError;
     },
     
     // Add a method to update configuration with offline support
