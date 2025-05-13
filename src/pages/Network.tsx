@@ -92,6 +92,39 @@ export default function Network() {
     setShowPassword(!showPassword);
   };
 
+  // Add this function to merge pending changes with cached data
+  const mergePendingChanges = useCallback((cachedData: NetworkData | WirelessConfig | DhcpDnsConfig, pendingConfigs: {endpoint: string; method: string; data: Record<string, unknown>}[]) => {
+    if (!pendingConfigs || pendingConfigs.length === 0) return cachedData;
+    
+    // Create a deep copy to avoid modifying the original
+    const result = JSON.parse(JSON.stringify(cachedData));
+    
+    // Apply each pending config
+    for (const config of pendingConfigs) {
+      if (config.endpoint.includes('wireless.cgi') && config.method === 'POST') {
+        // Apply wireless changes
+        Object.assign(result, config.data);
+      } else if (config.endpoint.includes('dhcp_dns.cgi') && config.method === 'POST') {
+        // Apply DHCP/DNS changes
+        Object.assign(result, config.data);
+      } else if (config.endpoint.includes('network.cgi') && config.method === 'POST') {
+        // Apply interface changes
+        if (result.interfaces && Array.isArray(result.interfaces)) {
+          const interfaceId = config.data.interface as string;
+          const interfaceIndex = result.interfaces.findIndex((iface: {id: string}) => iface.id === interfaceId);
+          if (interfaceIndex >= 0) {
+            result.interfaces[interfaceIndex] = {
+              ...result.interfaces[interfaceIndex],
+              ...config.data
+            };
+          }
+        }
+      }
+    }
+    
+    return result;
+  }, []);
+
   // Query for interfaces
   const { data: networkData, isLoading: isLoadingInterfaces, error: interfacesError } = useQuery<NetworkData>({
     queryKey: ["network", "interfaces"],
@@ -114,10 +147,18 @@ export default function Network() {
           return newCount;
         });
         
-        // Try to load from cache
+        // Get cached data
         const cachedData = localStorage.getItem("networkInterfaces");
         if (cachedData) {
-          return JSON.parse(cachedData);
+          const parsedData = JSON.parse(cachedData);
+          
+          // Get pending interface configs and merge them
+          const pendingConfigs = getPendingConfigs().filter(
+            config => config.endpoint.includes('network.cgi')
+          );
+          
+          // Return merged data (pending changes override cached data)
+          return mergePendingChanges(parsedData, pendingConfigs as {endpoint: string; method: string; data: Record<string, unknown>}[]);
         }
         throw error;
       }
@@ -147,9 +188,18 @@ export default function Network() {
           return newCount;
         });
         
+        // Get cached data
         const cachedData = localStorage.getItem("wirelessConfig");
         if (cachedData) {
-          return JSON.parse(cachedData);
+          const parsedData = JSON.parse(cachedData);
+          
+          // Get pending wireless configs and merge them
+          const pendingConfigs = getPendingConfigs().filter(
+            config => config.endpoint.includes('wireless.cgi')
+          );
+          
+          // Return merged data (pending changes override cached data)
+          return mergePendingChanges(parsedData, pendingConfigs as {endpoint: string; method: string; data: Record<string, unknown>}[]);
         }
         throw error;
       }
@@ -184,9 +234,18 @@ export default function Network() {
           return newCount;
         });
         
+        // Get cached data
         const cachedData = localStorage.getItem("dhcpDnsConfig");
         if (cachedData) {
-          return JSON.parse(cachedData);
+          const parsedData = JSON.parse(cachedData);
+          
+          // Get pending DHCP/DNS configs and merge them
+          const pendingConfigs = getPendingConfigs().filter(
+            config => config.endpoint.includes('dhcp_dns.cgi')
+          );
+          
+          // Return merged data (pending changes override cached data)
+          return mergePendingChanges(parsedData, pendingConfigs as {endpoint: string; method: string; data: Record<string, unknown>}[]);
         }
         throw error;
       }
@@ -1162,6 +1221,9 @@ export default function Network() {
     </div>
   );
 }
+
+
+
 
 
 
