@@ -3,11 +3,11 @@
 # Debug log to trace execution
 echo "$(date): REQUEST_METHOD=$REQUEST_METHOD" >> /tmp/network_cgi.log
 
-# Send CORS headers
+# Send CORS headers with expanded allowed headers
 echo "Content-Type: application/json"
 echo "Access-Control-Allow-Origin: *"
 echo "Access-Control-Allow-Methods: POST, GET, OPTIONS"
-echo "Access-Control-Allow-Headers: Content-Type"
+echo "Access-Control-Allow-Headers: Content-Type, Pragma, Cache-Control"
 echo
 
 # Handle preflight OPTIONS request
@@ -140,6 +140,7 @@ fi
 # Unknown method
 echo "{\"status\": \"error\", \"message\": \"Unsupported method: $REQUEST_METHOD\"}"
 echo "$(date): Unknown method: $REQUEST_METHOD" >> /tmp/network_cgi.log
+
 
 
 

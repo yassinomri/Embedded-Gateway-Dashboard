@@ -1,54 +1,71 @@
 import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
 import { data } from "react-router-dom";
 
+// Add caching mechanism
+const CACHE_DURATION = 60000; // 1 minute cache duration
+let interfacesCache: { data: NetworkData; timestamp: number } | null = null;
+let wirelessCache: { data: WirelessConfig; timestamp: number } | null = null;
+let dhcpDnsCache: { data: DhcpDnsConfig; timestamp: number } | null = null;
+
 export const apiClient = {
   getInterfaces: async (): Promise<NetworkData> => {
+    // Check if we have valid cached data
+    const now = Date.now();
+    if (interfacesCache && (now - interfacesCache.timestamp < CACHE_DURATION)) {
+      console.log("Using cached interfaces data");
+      return interfacesCache.data;
+    }
+    
     const url = "http://192.168.1.2/cgi-bin/network.cgi?option=get";
 
     console.log("getInterfaces Request:", { url, headers: { "Content-Type": "application/json" } });
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const responseText = await response.text();
-    console.log("getInterfaces Response:", {
-      url,
-      status: response.status,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseText,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
-    }
-
-    let data: NetworkData;
     try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      // Fallback: Extract first valid JSON object
-      const match = responseText.match(/\{[\s\S]*?\}(?=\s*\{|$)/);
-      if (match) {
-        try {
-          data = JSON.parse(match[0]);
-          console.log("getInterfaces Fallback: Parsed first JSON object:", data);
-        } catch (fallbackError) {
-          throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Fallback failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}, Body: ${responseText}`);
-        }
-      } else {
-        throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, No valid JSON found, Body: ${responseText}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // Increase timeout to 8 seconds
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        // Add cache busting
+        cache: 'no-store',
+      });
+      
+      clearTimeout(timeoutId);
+
+      const responseText = await response.text();
+      console.log("getInterfaces Response:", {
+        url,
+        status: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: responseText,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
       }
-    }
 
-    if (!data.interfaces || !Array.isArray(data.interfaces)) {
-      throw new Error(`Invalid response format: ${responseText}`);
+      try {
+        const data = JSON.parse(responseText);
+        // Update cache
+        interfacesCache = { data, timestamp: now };
+        return data;
+      } catch (parseError) {
+        console.error("JSON Parse Error:", parseError);
+        throw new Error(`Failed to parse response: ${responseText}`);
+      }
+    } catch (error) {
+      console.error("Network Request Error:", error);
+      // If we have cached data, return it even if it's stale rather than failing completely
+      if (interfacesCache) {
+        console.log("Returning stale cached data after fetch failure");
+        return interfacesCache.data;
+      }
+      throw error;
     }
-
-    return data;
   },
 
   updateInterface: async (
@@ -89,50 +106,72 @@ export const apiClient = {
   },
 
   getWireless: async (): Promise<WirelessConfig> => {
-    const url = "http://192.168.1.2/cgi-bin/wireless.cgi?option=get";
-    console.log("getWireless Request:", { url });
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const responseText = await response.text();
-    console.log("getWireless Response:", {
-      url,
-      status: response.status,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseText,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    // Check if we have valid cached data
+    const now = Date.now();
+    if (wirelessCache && (now - wirelessCache.timestamp < CACHE_DURATION)) {
+      console.log("Using cached wireless data");
+      return wirelessCache.data;
     }
-
+    
+    const url = "http://192.168.1.2/cgi-bin/wireless.cgi?option=get";
+    console.log("Fetching wireless data from:", url);
+    
     try {
-      const data = JSON.parse(responseText);
-      if (data.status === "success" && data.data) {
-        // Map encryption types if needed
-        const encryption = data.data.encryption;
-        
-        // Log the raw encryption value for debugging
-        console.log("Raw encryption value:", encryption);
-        
-        return {
-          ssid: data.data.ssid,
-          password: data.data.password,
-          encryption: encryption, // Use the raw value from backend
-          channel: data.data.channel,
-          enabled: data.data.enabled,
-          band: data.data.band,
-        };
-      } else {
-        throw new Error(`Invalid response format: ${responseText}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
-    } catch (e) {
-      throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Body: ${responseText}`);
+      
+      const responseText = await response.text();
+      console.log("Wireless API Response:", responseText);
+      
+      try {
+        const data = JSON.parse(responseText);
+        console.log("Parsed wireless data:", data);
+        
+        // Extract the actual wireless config from the response
+        // If data has a 'data' property, use that, otherwise use the data itself
+        const wirelessConfig = data.data || data;
+        
+        // Ensure all required fields are present
+        const normalizedConfig = {
+          ssid: wirelessConfig.ssid || '',
+          password: wirelessConfig.password || '',
+          channel: wirelessConfig.channel || 'Auto',
+          encryption: wirelessConfig.encryption || 'psk2',
+          enabled: typeof wirelessConfig.enabled === 'boolean' ? wirelessConfig.enabled : true,
+          band: wirelessConfig.band || '2.4g'
+        };
+        
+        console.log("Normalized wireless config:", normalizedConfig);
+        
+        // Update cache
+        wirelessCache = { data: normalizedConfig, timestamp: now };
+        return normalizedConfig;
+      } catch (parseError) {
+        console.error("JSON Parse Error:", parseError);
+        throw new Error(`Failed to parse response: ${responseText}`);
+      }
+    } catch (error) {
+      console.error("Error fetching wireless data:", error);
+      // If we have cached data, return it even if it's stale
+      if (wirelessCache) {
+        return wirelessCache.data;
+      }
+      throw error;
     }
   },
 
@@ -174,59 +213,46 @@ export const apiClient = {
   },
 
   getDhcpDns: async (): Promise<DhcpDnsConfig> => {
-
-    const url = "http://192.168.1.2/cgi-bin/dhcp_dns.cgi?option=get"
-    console.log("getDhcpDns Request:", { url, headers: { "Content-Type": "application/json" } });
-
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const responseText = await response.text();
-    console.log("getDhcpDns Response:", { 
-      url,
-      status: response.status,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: responseText,
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}, Body: ${responseText}`);
+    // Check if we have valid cached data
+    const now = Date.now();
+    if (dhcpDnsCache && (now - dhcpDnsCache.timestamp < CACHE_DURATION)) {
+      console.log("Using cached DHCP/DNS data");
+      return dhcpDnsCache.data;
     }
-
-    let data: DhcpDnsConfig;
-    try { 
-      data = JSON.parse(responseText);
-    }
-    catch (e) {
-      // Fallback: Extract first valid JSON object
-      const match = responseText.match(/\{[\s\S]*?\}(?=\s*\{|$)/);
-      if (match) {
-        try {
-          data = JSON.parse(match[0]);
-          console.log("getDhcpDns Fallback: Parsed first JSON object:", data);
-        } catch (fallbackError) {
-          throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, Fallback failed: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}, Body: ${responseText}`);
-        }
-      } else {
-        throw new Error(`JSON parse error: ${e instanceof Error ? e.message : 'Unknown'}, No valid JSON found, Body: ${responseText}`);
+    
+    const url = "http://192.168.1.2/cgi-bin/dhcp_dns.cgi?option=get";
+    
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
+      
+      const data = await response.json();
+      // Update cache
+      dhcpDnsCache = { data, timestamp: now };
+      return data;
+    } catch (error) {
+      console.error("Error fetching DHCP/DNS data:", error);
+      // If we have cached data, return it even if it's stale
+      if (dhcpDnsCache) {
+        return dhcpDnsCache.data;
+      }
+      throw error;
     }
-    // Validate required fields
-  if (
-    typeof data.dhcpEnabled !== "boolean" ||
-    !data.rangeStart ||
-    !data.rangeEnd ||
-    !data.leaseTime ||
-    typeof data.dhcpv6 !== "string" ||
-    typeof data.ra !== "string"
-  ) {
-    throw new Error(`Invalid response format: ${responseText}`);
-  }
-    return data;
   },
 
   updateDhcpDns: async (config: DhcpDnsConfig): Promise<void> => {

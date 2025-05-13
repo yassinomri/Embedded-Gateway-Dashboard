@@ -15,14 +15,15 @@ export const apiClient = {
         }
         
         const url = "http://192.168.1.2/cgi-bin/dashboard_data.cgi";
-        const maxRetries = 2; // Reduce max retries
+        const maxRetries = 2;
         let retryCount = 0;
+        let lastError = null;
         
         while (retryCount < maxRetries) {
           try {
             console.log(`Fetching dashboard data (attempt ${retryCount + 1})`);
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // Increase timeout to 8 seconds
             
             const response = await fetch(url, {
               method: "GET",
@@ -30,6 +31,8 @@ export const apiClient = {
                 "Content-Type": "application/json",
               },
               signal: controller.signal,
+              // Add cache busting to prevent browser caching
+              cache: 'no-store',
             });
             
             clearTimeout(timeoutId);
@@ -48,21 +51,27 @@ export const apiClient = {
             
             return data;
           } catch (error) {
+            lastError = error;
             retryCount++;
             console.warn(`Attempt ${retryCount}/${maxRetries} failed:`, error);
             
             if (retryCount >= maxRetries) {
               console.error("Error fetching dashboard data after retries:", error);
+              // If we have cached data, return it even if it's stale rather than failing completely
+              if (dashboardDataCache) {
+                console.log("Returning stale cached data after fetch failure");
+                return dashboardDataCache.data;
+              }
               throw error;
             }
             
-            // Wait before retrying (shorter backoff)
-            await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
           }
         }
         
         // This should never be reached due to the throw in the loop
-        throw new Error("Failed to fetch dashboard data");
+        throw lastError || new Error("Failed to fetch dashboard data");
     },
     
     // Add a method to update configuration with offline support

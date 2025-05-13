@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient, QueryClient } from "@tanstack/re
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiClient } from "@/lib/network-api";
-import { Network as NetworkIcon, Wifi, Database, WifiOff, Eye, EyeOff } from "lucide-react";
+import { Network as NetworkIcon, Wifi, Database, WifiOff, Eye, EyeOff, Loader2 } from "lucide-react";
 import { NetworkData, WirelessConfig, DhcpDnsConfig } from "@/types/network";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import "@/styles/Network.css";
 import { savePendingConfig } from "@/lib/offline-config";
+import { SyncManager } from "@/components/SyncManager";
+import { getPendingConfigs, removePendingConfig } from "@/lib/offline-config";
 
 // Utility functions
 function isValidIP(ip: string) {
@@ -27,7 +30,8 @@ function isValidSSID(ssid: string) {
   return ssid.length > 0 && ssid.length <= 32;
 }
 
-function isValidPassword(password: string) {
+function isValidPassword(password: string | undefined): boolean {
+  if (!password) return false;
   return password.length >= 8 && password.length <= 63;
 }
 
@@ -42,24 +46,57 @@ export default function Network() {
   // Add a state to track if the gateway is online
   const [isGatewayOnline, setIsGatewayOnline] = useState(false);
 
+  // Add state for tracking consecutive failures
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const FAILURE_THRESHOLD = 3; // Number of consecutive failures before marking as offline
+
   // Function to check if gateway is online
   const checkGatewayStatus = async () => {
     try {
-      // Try to fetch a simple resource from the gateway
-      const response = await fetch("http://192.168.1.1/cgi-bin/ping.cgi", {
-        method: "GET",
-        signal: AbortSignal.timeout(3000)
-      });
+      // Try multiple endpoints to determine if gateway is online
+      const endpoints = [
+        "http://192.168.1.2/cgi-bin/ping.cgi",
+        "http://192.168.1.2/cgi-bin/network.cgi?option=get",
+        "http://192.168.1.2/cgi-bin/wireless.cgi?option=get",
+        "http://192.168.1.2/cgi-bin/dhcp_dns.cgi?option=get"
+      ];
       
-      if (response.ok) {
-        setIsGatewayOnline(true);
-        return true;
-      } else {
-        setIsGatewayOnline(false);
-        return false;
+      // Try each endpoint
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint, {
+            method: "GET",
+            signal: AbortSignal.timeout(5000),
+            cache: 'no-store'
+          });
+          
+          if (response.ok) {
+            setConsecutiveFailures(0);
+            setIsGatewayOnline(true);
+            return true;
+          }
+        } catch (endpointError) {
+          console.log(`Endpoint ${endpoint} check failed, trying next...`);
+        }
       }
+      
+      // If we get here, all endpoints failed
+      setConsecutiveFailures(prev => {
+        const newCount = prev + 1;
+        if (newCount >= FAILURE_THRESHOLD) {
+          setIsGatewayOnline(false);
+        }
+        return newCount;
+      });
+      return false;
     } catch (error) {
-      setIsGatewayOnline(false);
+      setConsecutiveFailures(prev => {
+        const newCount = prev + 1;
+        if (newCount >= FAILURE_THRESHOLD) {
+          setIsGatewayOnline(false);
+        }
+        return newCount;
+      });
       return false;
     }
   };
@@ -91,12 +128,22 @@ export default function Network() {
     queryFn: async () => {
       try {
         const data = await apiClient.getInterfaces();
+        setConsecutiveFailures(0); // Reset failure counter on success
         setIsGatewayOnline(true);
         // Cache the data for offline use
         localStorage.setItem("networkInterfaces", JSON.stringify(data));
         return data;
       } catch (error) {
-        setIsGatewayOnline(false);
+        // Increment failure counter
+        setConsecutiveFailures(prev => {
+          const newCount = prev + 1;
+          // Only set gateway offline after consecutive failures
+          if (newCount >= FAILURE_THRESHOLD) {
+            setIsGatewayOnline(false);
+          }
+          return newCount;
+        });
+        
         // Try to load from cache
         const cachedData = localStorage.getItem("networkInterfaces");
         if (cachedData) {
@@ -111,16 +158,25 @@ export default function Network() {
   });
 
   // Query for wireless
-  const { data: wirelessData, isLoading: isLoadingWireless, error: wirelessError } = useQuery<WirelessConfig>({
+  const { data: wirelessData, isLoading: isLoadingWireless, error: wirelessError } = useQuery({
     queryKey: ["network", "wireless"],
     queryFn: async () => {
       try {
         const data = await apiClient.getWireless();
+        setConsecutiveFailures(0);
         setIsGatewayOnline(true);
         localStorage.setItem("wirelessConfig", JSON.stringify(data));
+        console.log("Wireless data fetched:", data);
         return data;
       } catch (error) {
-        setIsGatewayOnline(false);
+        setConsecutiveFailures(prev => {
+          const newCount = prev + 1;
+          if (newCount >= FAILURE_THRESHOLD) {
+            setIsGatewayOnline(false);
+          }
+          return newCount;
+        });
+        
         const cachedData = localStorage.getItem("wirelessConfig");
         if (cachedData) {
           return JSON.parse(cachedData);
@@ -132,17 +188,32 @@ export default function Network() {
     retryDelay: 3000,
   });
 
+  // Add a debug log to see what's happening with the wireless data
+  useEffect(() => {
+    console.log("Wireless data state:", wirelessData);
+  }, [wirelessData]);
+
   // Query for DHCP & DNS
   const { data: dhcpDnsData, isLoading: isLoadingDhcpDns, error: dhcpDnsError } = useQuery<DhcpDnsConfig>({
     queryKey: ["network", "dhcp-dns"],
     queryFn: async () => {
       try {
         const data = await apiClient.getDhcpDns();
+        setConsecutiveFailures(0); // Reset failure counter on success
         setIsGatewayOnline(true);
         localStorage.setItem("dhcpDnsConfig", JSON.stringify(data));
         return data;
       } catch (error) {
-        setIsGatewayOnline(false);
+        // Increment failure counter
+        setConsecutiveFailures(prev => {
+          const newCount = prev + 1;
+          // Only set gateway offline after consecutive failures
+          if (newCount >= FAILURE_THRESHOLD) {
+            setIsGatewayOnline(false);
+          }
+          return newCount;
+        });
+        
         const cachedData = localStorage.getItem("dhcpDnsConfig");
         if (cachedData) {
           return JSON.parse(cachedData);
@@ -177,16 +248,14 @@ export default function Network() {
   const [interfaceConfig, setInterfaceConfig] = useState<{ [key: string]: { gateway: string } }>({});
 
   // State for wireless and DHCP & DNS
-  const [wirelessConfig, setWirelessConfig] = useState<WirelessConfig & { band?: string }>(
-    wirelessData || {
-      ssid: '',
-      password: '',
-      channel: 'Auto',
-      encryption: 'WPA2',
-      enabled: false,
-      band: '2.4g', // Default to 2.4GHz
-    }
-  );
+  const [wirelessConfig, setWirelessConfig] = useState<WirelessConfig & { band?: string }>({
+    ssid: '',
+    password: '',  // Ensure this is initialized as empty string
+    channel: 'Auto',
+    encryption: 'WPA2',
+    enabled: false,
+    band: '2.4g', // Default to 2.4GHz
+  });
 
       // Update channel when band changes
   useEffect(() => {
@@ -333,8 +402,12 @@ export default function Network() {
       return false;
     }
     
-    if (wirelessConfig.encryption !== "None" && !isValidPassword(wirelessConfig.password)) {
-      return false;
+    // Only validate password if encryption is not None
+    if (wirelessConfig.encryption !== "None") {
+      // Use our improved isValidPassword function
+      if (!isValidPassword(wirelessConfig.password)) {
+        return false;
+      }
     }
     
     return true;
@@ -344,8 +417,14 @@ export default function Network() {
     return ssid && ssid.trim() !== "" && ssid.length <= 32;
   };
 
-  const isValidPassword = (password: string) => {
-    return wirelessConfig.encryption === "None" || (password.length >= 8 && password.length <= 63);
+  const isValidPassword = (password: string | undefined | null): boolean => {
+    // Explicitly check for null, undefined, or empty string
+    if (password === null || password === undefined || password === '') {
+      return false;
+    }
+    
+    // Now we can safely check the length
+    return password.length >= 8 && password.length <= 63;
   };
 
   const validateDhcpDns = () => {
@@ -442,9 +521,27 @@ export default function Network() {
   useEffect(() => {
     if (wirelessData) {
       console.log("Wireless data received:", wirelessData);
+      
+      // Check if wirelessData has a data property or is the data itself
+      const data = wirelessData.data || wirelessData;
+      
+      // Update the wirelessConfig state with the correct values
       setWirelessConfig({
-        ...wirelessData,
-        band: wirelessData.band || '2.4g' // Ensure band is properly set from backend data
+        ssid: data.ssid || '',
+        password: data.password || '',
+        channel: data.channel || 'Auto',
+        encryption: data.encryption || 'psk2',
+        enabled: typeof data.enabled === 'boolean' ? data.enabled : true,
+        band: data.band || '2.4g'
+      });
+      
+      console.log("Updated wirelessConfig:", {
+        ssid: data.ssid || '',
+        password: data.password || '',
+        channel: data.channel || 'Auto',
+        encryption: data.encryption || 'psk2',
+        enabled: typeof data.enabled === 'boolean' ? data.enabled : true,
+        band: data.band || '2.4g'
       });
     }
   }, [wirelessData]);
@@ -553,8 +650,24 @@ export default function Network() {
 
 
 
+  // Add this debug component at the beginning of your Network component
+  const DebugComponent = () => {
+    console.log("Debug - wirelessConfig:", wirelessConfig);
+    console.log("Debug - wirelessConfig.password:", wirelessConfig.password);
+    console.log("Debug - typeof wirelessConfig.password:", typeof wirelessConfig.password);
+    
+    // Test our isValidPassword function
+    console.log("Debug - isValidPassword(''):", isValidPassword(''));
+    console.log("Debug - isValidPassword(undefined):", isValidPassword(undefined));
+    console.log("Debug - isValidPassword(null):", isValidPassword(null));
+    console.log("Debug - isValidPassword('password'):", isValidPassword('password'));
+    
+    return null;
+  };
+
   return (
     <div className="container mx-auto p-6">
+      <DebugComponent />
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Network Configuration</h1>
         {!isGatewayOnline && (
@@ -667,6 +780,24 @@ export default function Network() {
               <CardTitle>Wireless Networks</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Comment out or remove the debug information in production */}
+              {/* 
+              {isLoadingWireless ? (
+                <div className="mb-4 p-2 bg-gray-100 rounded">Loading wireless data...</div>
+              ) : wirelessError ? (
+                <div className="mb-4 p-2 bg-red-100 rounded">
+                  Error loading wireless data: {wirelessError.toString()}
+                </div>
+              ) : !wirelessData ? (
+                <div className="mb-4 p-2 bg-yellow-100 rounded">No wireless data available</div>
+              ) : (
+                <div className="mb-4 p-2 bg-green-100 rounded">
+                  <p>Raw wireless data: {JSON.stringify(wirelessData)}</p>
+                  <p>Current wirelessConfig: {JSON.stringify(wirelessConfig)}</p>
+                </div>
+              )}
+              */}
+
               <form className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* SSID */}
@@ -956,6 +1087,17 @@ export default function Network() {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

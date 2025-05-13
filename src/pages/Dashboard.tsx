@@ -64,6 +64,10 @@ interface InterfaceBandwidthHistory {
 }
 
 export default function Dashboard() {
+  // Add a more stable online detection mechanism
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const FAILURE_THRESHOLD = 3; // Number of consecutive failures before marking as offline
+
   // Use React Query for data fetching with caching
   const { 
     data: dashboardData, 
@@ -76,11 +80,21 @@ export default function Dashboard() {
       try {
         console.log("Fetching dashboard data...");
         const response = await apiClient.getDashboardData();
+        // Reset failure counter on success
+        setConsecutiveFailures(0);
         setSystemOnline(true);
         return response;
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
-        setSystemOnline(false);
+        // Increment failure counter
+        setConsecutiveFailures(prev => {
+          const newCount = prev + 1;
+          // Only set system offline after consecutive failures
+          if (newCount >= FAILURE_THRESHOLD) {
+            setSystemOnline(false);
+          }
+          return newCount;
+        });
         throw err;
       }
     },

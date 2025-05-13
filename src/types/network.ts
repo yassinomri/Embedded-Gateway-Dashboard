@@ -11,7 +11,7 @@ export interface NetworkData {
 
 export interface WirelessConfig {
   ssid: string;
-  password: string;
+  password?: string; 
   channel: string;
   encryption: string;
   enabled: boolean;
