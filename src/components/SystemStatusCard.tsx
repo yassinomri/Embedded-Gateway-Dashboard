@@ -67,7 +67,7 @@ export function SystemStatusCard({
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="pt-6 pb-4 flex-grow flex flex-col">
+      <CardContent className="pt-8 pb-4 flex-grow flex flex-col">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Memory Usage Chart */}
           <TooltipProvider>
@@ -149,7 +149,7 @@ export function SystemStatusCard({
         </div>
 
         {/* Additional System Info */}
-        <div className="mt-6 space-y-3">
+        <div className="mt-6 space-y-3 pt-10">
           <div className="grid grid-cols-1 gap-3">
             <TooltipProvider>
               <Tooltip>
