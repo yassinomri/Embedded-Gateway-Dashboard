@@ -35,6 +35,7 @@ import { ArrowUpDown } from "lucide-react";
 import { BandwidthUsageCard } from "@/components/BandwidthUsageCard";
 import { ConnectedDevicesCard } from "@/components/ConnectedDevicesCard";
 import { NetworkInterfacesCard } from "@/components/NetworkInterfacesCard";
+import { AlertsCard, SecurityAlert } from "@/components/AlertsCard";
 
 // Memoize chart components to prevent unnecessary re-renders
 
@@ -121,6 +122,45 @@ export default function Dashboard() {
     // Only fetch if system is online
     enabled: systemOnline,
   });
+
+  // Sample alerts data (in a real app, this would come from an API)
+  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([
+    {
+      id: '1',
+      type: 'firewall',
+      severity: 'high',
+      message: 'Multiple connection attempts blocked',
+      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
+      source: '192.168.1.105',
+      details: 'Client attempted to access port 22 (SSH) multiple times',
+    },
+    {
+      id: '2',
+      type: 'wifi',
+      severity: 'medium',
+      message: 'Multiple failed Wi-Fi authentication attempts',
+      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 minutes ago
+      details: '5 failed attempts with incorrect password',
+    },
+    {
+      id: '3',
+      type: 'network',
+      severity: 'critical',
+      message: 'Possible port scanning detected',
+      timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), // 2 hours ago
+      source: '192.168.1.110',
+      details: 'Sequential port scanning pattern detected across multiple services',
+    },
+    {
+      id: '4',
+      type: 'system',
+      severity: 'low',
+      message: 'System update available',
+      timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(), // 4 hours ago
+      details: 'New firmware version 2.1.3 is available for installation',
+      resolved: true,
+    },
+  ]);
 
   // Rest of your state variables
   const [, setHistoricalData] = useState([]);
@@ -624,47 +664,10 @@ export default function Dashboard() {
             networkInterfaces={networkInterfaces}
           />
 
-          {/* Active Connections */}
-          <Card className="col-span-4"> {/* Adjust grid span to give more space */}
-            <CardHeader>
-              <CardTitle>Active Connections</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {activeConnections.length > 0 ? (
-                <div className="overflow-y-auto max-h-96"> {/* Make the table scrollable */}
-                  <table className="table-auto w-full text-sm border-collapse border border-gray-300">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left border border-gray-300">Protocol</th>
-                        <th className="px-4 py-2 text-left border border-gray-300">Recv-Q</th>
-                        <th className="px-4 py-2 text-left border border-gray-300">Send-Q</th>
-                        <th className="px-4 py-2 text-left border border-gray-300">Local Address</th>
-                        <th className="px-4 py-2 text-left border border-gray-300">Foreign Address</th>
-                        <th className="px-4 py-2 text-left border border-gray-300">State</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {activeConnections.map((connection, index) => (
-                        <tr
-                          key={index}
-                          className={index % 2 === 0 ? "bg-white" : "bg-gray-50"} // Alternating row colors
-                        >
-                          <td className="px-4 py-2 border border-gray-300">{connection.protocol}</td>
-                          <td className="px-4 py-2 border border-gray-300">{connection.recvQ}</td>
-                          <td className="px-4 py-2 border border-gray-300">{connection.sendQ}</td>
-                          <td className="px-4 py-2 border border-gray-300">{connection.localAddress}</td>
-                          <td className="px-4 py-2 border border-gray-300">{connection.foreignAddress}</td>
-                          <td className="px-4 py-2 border border-gray-300">{connection.state}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p>No active connections found.</p>
-              )}
-            </CardContent>
-          </Card>
+          {/* Security Alerts */}
+          <AlertsCard 
+            alerts={securityAlerts}
+          />
 
         </div>
       )}
