@@ -36,6 +36,16 @@ const EMPTY_DATA: PerformanceData = {
   metrics: { latency: 0, packetLoss: 0, throughput: 0 },
   history: [],
   qos: { enabled: false },
+  maxValues: {
+    latency: 0,
+    packetLoss: 0,
+    throughput: 0
+  },
+  averageValues: {
+    latency: 0,
+    packetLoss: 0,
+    throughput: 0
+  }
 };
 
 const MetricCardSkeleton = () => (

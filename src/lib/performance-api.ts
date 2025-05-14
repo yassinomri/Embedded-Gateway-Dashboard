@@ -14,6 +14,8 @@ export interface HistoryEntry {
 }
 
 export interface PerformanceData {
+  maxValues: { latency: number; packetLoss: number; throughput: number };
+  averageValues: { latency: number; packetLoss: number; throughput: number };
   metrics: Metrics;
   history: HistoryEntry[];
   qos: { enabled: boolean };

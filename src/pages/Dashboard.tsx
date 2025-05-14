@@ -3,7 +3,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
 import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
-import { savePerformanceData, getHistoricalData, getBandwidthData, saveBandwidthData } from "@/lib/db";
 import { 
   RefreshCw, 
   WifiOff, 
@@ -32,6 +31,10 @@ import { useQuery } from '@tanstack/react-query';
 import { startStatusChecker, getGatewayStatus, subscribeToStatusChanges } from "@/lib/status-checker";
 import { useNavigate, useLocation } from "react-router-dom";
 import { debounce } from "lodash";
+import { NetworkQualityCard } from "@/components/NetworkQualityCard";
+import { SpeedTestCard } from "@/components/SpeedTestCard";
+import { FirewallStatusCard } from "@/components/FirewallStatusCard";
+import { cn } from "@/lib/utils";
 
 // Memoize chart components to prevent unnecessary re-renders
 const MemoizedDoughnut = memo(React.lazy(() => 
@@ -123,7 +126,7 @@ export default function Dashboard() {
   });
 
   // Rest of your state variables
-  const [historicalData, setHistoricalData] = useState([]);
+  const [, setHistoricalData] = useState([]);
   const [eth0BandwidthHistory, setEth0BandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
   const [wifiBandwidthHistory, setWifiBandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
   const [selectedInterfaces, setSelectedInterfaces] = useState({
@@ -286,8 +289,6 @@ export default function Dashboard() {
     ChartDataLabels
   );
 
-  const loadingContent = isLoading ? <p>Loading dashboard data...</p> : null;
-  const errorContent = error ? <p className="text-red-500">{error instanceof Error ? error.message : String(error)}</p> : null;
 
   // Use useMemo for expensive calculations to prevent recalculations on re-renders
   const memoryInfo = useMemo(() => {
@@ -574,9 +575,9 @@ export default function Dashboard() {
         </div>
       ) : (
         /* Regular dashboard content when online */
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {/* System Status */}
-          <Card className="col-span-2">
+        <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-4">
+          {/* System Status - Left Side (2 columns wide) */}
+          <Card className={cn("flex flex-col", "lg:col-span-2")}>
             <CardHeader>
               <div className="flex items-center space-x-2">
                 <CardTitle>
@@ -661,56 +662,20 @@ export default function Dashboard() {
                   <span className="text-lg ml-2 font-medium">{loadAverage}</span>
                 </p>
               </div>
-
             </CardContent>
           </Card>
 
-          {/* Firewall Status */}
-          <Card className="col-span-2">
-            <CardHeader>
-              <CardTitle>
-                <div className="flex items-center">
-                  <Shield className="mr-2 h-5 w-5" /> Firewall
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {/* Status Badge */}
-                <div className="flex items-center space-x-2">
-                  <span className="text-xl">🔥</span>
-                  <span className="text-lg font-bold">Status: </span>
-                  <span
-                    className={`px-2 py-1 text-white text-sm rounded ${
-                      dashboardData?.firewallStatus?.status ? "bg-green-500" : "bg-red-500"
-                    }`}
-                  >
-                    {dashboardData?.firewallStatus?.status ? "Active" : "Inactive"}
-                  </span>
-                </div>
-
-                {/* Summary Info */}
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>
-                    <strong>{dashboardData?.firewallStatus?.rules?.activeRules || 0}</strong> Active Rules
-                  </li>
-                  <li>
-                    <strong>{dashboardData?.firewallStatus?.rules?.totalRules || 0}</strong> Total Rules
-                  </li>
-                </ul>
-
-                {/* Go to Firewall Page Button */}
-                <div className="mt-4">
-                  <Button
-                    onClick={() => navigate("/firewall")}
-                    className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                  >
-                    Go to Firewall Page
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Right Side Cards (2 columns wide) */}
+          <div className="lg:col-span-2 flex flex-col gap-4 h-full">
+            {/* Top Row: Firewall and Network Quality side by side - with increased height */}
+            <div className="grid grid-cols-2 gap-4 flex-grow">
+              <FirewallStatusCard className="h-full" />
+              <NetworkQualityCard className="h-full" />
+            </div>
+            
+            {/* Bottom Row: Speed Test Card full width */}
+            <SpeedTestCard />
+          </div>
 
           {/* Bandwidth Usage Section */}
           <Card className="col-span-4">
