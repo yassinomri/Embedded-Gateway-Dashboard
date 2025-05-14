@@ -33,6 +33,7 @@ import { FirewallStatusCard } from "@/components/FirewallStatusCard";
 import { SystemStatusCard } from "@/components/SystemStatusCard";
 import { ArrowUpDown } from "lucide-react";
 import { BandwidthUsageCard } from "@/components/BandwidthUsageCard";
+import { ConnectedDevicesCard } from "@/components/ConnectedDevicesCard";
 
 // Memoize chart components to prevent unnecessary re-renders
 
@@ -611,41 +612,9 @@ export default function Dashboard() {
           />
 
           {/* Connected Devices */}
-          <Card className="col-span-4">
-            <CardHeader>
-              <CardTitle>
-                <div className="flex items-center">
-                  <Smartphone className="mr-2 h-5 w-5" /> Connected Devices
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {connectedDevices && connectedDevices.length > 0 ? (
-                <table className="table-auto w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-2 text-left">IP Address</th>
-                      <th className="px-4 py-2 text-left">MAC Address</th>
-                      <th className="px-4 py-2 text-left">Hostname</th>
-                      <th className="px-4 py-2 text-left">Type</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {connectedDevices.map((device, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2">{device.ip}</td>
-                        <td className="px-4 py-2">{device.mac}</td>
-                        <td className="px-4 py-2">{device.hostname || "N/A"}</td>
-                        <td className="px-4 py-2">{device.connectionType}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>No connected devices found.</p>
-              )}
-            </CardContent>
-          </Card>
+          <ConnectedDevicesCard 
+            connectedDevices={connectedDevices}
+          />
 
 
 
