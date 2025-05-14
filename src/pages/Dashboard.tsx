@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo, Suspense, memo, useCallback } from
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
-import { DashboardData, NetworkInterface } from "@/types/dashboard-data";
+import { NetworkInterface } from "@/types/dashboard-data";
 import { 
   RefreshCw, 
   WifiOff, 
@@ -35,6 +35,7 @@ import { NetworkQualityCard } from "@/components/NetworkQualityCard";
 import { SpeedTestCard } from "@/components/SpeedTestCard";
 import { FirewallStatusCard } from "@/components/FirewallStatusCard";
 import { cn } from "@/lib/utils";
+import { ArrowUpDown } from "lucide-react";
 
 // Memoize chart components to prevent unnecessary re-renders
 const MemoizedDoughnut = memo(React.lazy(() => 
@@ -682,7 +683,7 @@ export default function Dashboard() {
             <CardHeader>
               <CardTitle>
                 <div className="flex items-center">
-                  <Activity className="mr-2 h-5 w-5" /> Download/Upload rates in Mbps
+                  <ArrowUpDown className="mr-2 h-5 w-5" /> Download/Upload rates in Mbps
                 </div>
               </CardTitle>
             </CardHeader>
