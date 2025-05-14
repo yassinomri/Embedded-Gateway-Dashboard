@@ -36,6 +36,7 @@ import { BandwidthUsageCard } from "@/components/BandwidthUsageCard";
 import { ConnectedDevicesCard } from "@/components/ConnectedDevicesCard";
 import { NetworkInterfacesCard } from "@/components/NetworkInterfacesCard";
 import { AlertsCard, SecurityAlert } from "@/components/AlertsCard";
+import { securityAlertsApi } from "@/lib/security-alerts-api";
 
 // Memoize chart components to prevent unnecessary re-renders
 
@@ -123,44 +124,28 @@ export default function Dashboard() {
     enabled: systemOnline,
   });
 
-  // Sample alerts data (in a real app, this would come from an API)
-  const [securityAlerts, setSecurityAlerts] = useState<SecurityAlert[]>([
-    {
-      id: '1',
-      type: 'firewall',
-      severity: 'high',
-      message: 'Multiple connection attempts blocked',
-      timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(), // 15 minutes ago
-      source: '192.168.1.105',
-      details: 'Client attempted to access port 22 (SSH) multiple times',
-    },
-    {
-      id: '2',
-      type: 'wifi',
-      severity: 'medium',
-      message: 'Multiple failed Wi-Fi authentication attempts',
-      timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(), // 45 minutes ago
-      details: '5 failed attempts with incorrect password',
-    },
-    {
-      id: '3',
-      type: 'network',
-      severity: 'critical',
-      message: 'Possible port scanning detected',
-      timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(), // 2 hours ago
-      source: '192.168.1.110',
-      details: 'Sequential port scanning pattern detected across multiple services',
-    },
-    {
-      id: '4',
-      type: 'system',
-      severity: 'low',
-      message: 'System update available',
-      timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(), // 4 hours ago
-      details: 'New firmware version 2.1.3 is available for installation',
-      resolved: true,
-    },
-  ]);
+  // Replace the static alerts with data from the API
+  const { 
+    data: securityAlerts = [], 
+    isLoading: alertsLoading,
+    refetch: refetchAlerts
+  } = useQuery({
+    queryKey: ['securityAlerts'],
+    queryFn: () => securityAlertsApi.getAlerts(10, false),
+    staleTime: 60000, // Consider data fresh for 60 seconds
+    enabled: systemOnline, // Only fetch if system is online
+  });
+
+  // Function to mark an alert as resolved
+  const handleResolveAlert = async (id: string) => {
+    try {
+      await securityAlertsApi.resolveAlert(id);
+      // Refetch alerts after resolving
+      refetchAlerts();
+    } catch (error) {
+      console.error('Failed to resolve alert:', error);
+    }
+  };
 
   // Rest of your state variables
   const [, setHistoricalData] = useState([]);
@@ -667,6 +652,8 @@ export default function Dashboard() {
           {/* Security Alerts */}
           <AlertsCard 
             alerts={securityAlerts}
+            isLoading={alertsLoading}
+            onResolve={handleResolveAlert}
           />
 
         </div>

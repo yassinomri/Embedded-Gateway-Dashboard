@@ -18,7 +18,7 @@ import Firewall from "@/pages/Firewall";
 import Performance from "@/pages/Performance";
 import PacketAnalyzer from "./pages/PacketAnalyzer";
 import System from "./pages/System";
-
+import SecurityLogs from "./pages/SecurityLogs";
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="container mx-auto p-6">
@@ -54,8 +54,8 @@ const App = () => (
 
               <Route path="/system" element={<System/>} />
               
-              {/* System Routes */}
-
+              {/* Add Security Logs Route */}
+              <Route path="/security-logs" element={<SecurityLogs />} />
             </Route>
             
             <Route path="*" element={<NotFound />} />

@@ -21,12 +21,14 @@ interface AlertsCardProps {
   className?: string;
   alerts: SecurityAlert[];
   isLoading?: boolean;
+  onResolve?: (id: string) => void;
 }
 
 export function AlertsCard({
   className,
   alerts = [],
-  isLoading = false
+  isLoading = false,
+  onResolve
 }: AlertsCardProps) {
   const navigate = useNavigate();
   
@@ -110,11 +112,22 @@ export function AlertsCard({
                       </div>
                     </AlertDescription>
                   </div>
-                  {alert.resolved && (
-                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                      Resolved
-                    </span>
-                  )}
+                  <div className="ml-2 flex flex-col items-end">
+                    {alert.resolved ? (
+                      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                        Resolved
+                      </span>
+                    ) : onResolve ? (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => onResolve(alert.id)}
+                        className="text-xs h-7"
+                      >
+                        Resolve
+                      </Button>
+                    ) : null}
+                  </div>
                 </div>
               </Alert>
             ))}
@@ -130,3 +143,4 @@ export function AlertsCard({
     </Card>
   );
 }
+
