@@ -808,7 +808,10 @@ export default function Network() {
       />
       
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Network Configuration</h1>
+        <div className="flex items-center gap-2">
+          <NetworkIcon size={24} className="text-blue-400" />
+          <h1 className="text-3xl font-bold">Network Configuration</h1>
+        </div>
         {!isGatewayOnline && (
           <div className="flex items-center text-amber-600 bg-amber-50 px-3 py-1 rounded-md">
             <WifiOff className="h-4 w-4 mr-2" />

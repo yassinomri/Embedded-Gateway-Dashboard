@@ -355,10 +355,10 @@ const Firewall: React.FC = () => {
   return (
     <div className="page-container">
       <header className="page-header">
-        <h1>
-          <Shield size={28} color="#00f6ff" />
-          Firewall Rules
-        </h1>
+        <div className="flex items-center gap-2">
+          <Shield size={24} className="text-blue-400" />
+          <h1 className="text-3xl font-bold">Firewall Rules</h1>
+        </div>
       </header>
       
       <OfflineBanner />
@@ -392,7 +392,7 @@ const Firewall: React.FC = () => {
             className="primary-button add-rule-button"
             disabled={updatePending}
           >
-            <Plus size={20} /> Add Rule
+            <Plus size={25}/> Add Rule
           </button>
         </div>
       </div>

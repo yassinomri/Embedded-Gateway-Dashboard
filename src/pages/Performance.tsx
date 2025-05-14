@@ -180,7 +180,7 @@ const Performance = () => {
     <div className="w-full px-4 py-6 bg-gray-50 space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 rounded-lg shadow-sm gap-4">
         <div className="flex items-center gap-2">
-          <Network size={24} className="text-blue-600" />
+          <Wifi size={24} className="text-blue-400" />
           <h1 className="text-3xl font-bold text-gray-800">Network Performance</h1>
         </div>
         <div className="flex items-center gap-3">

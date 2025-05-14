@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Network, Radar } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
+import { Card, CardHeader, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { fetchCapturedPackets } from '@/lib/packet-analyzer-api';
 import { PacketData } from '@/types/packet-analyzer';
-import '@/styles/PacketAnalyzer.css';
+import { cn } from "@/lib/utils";
 
 const formatTimestamp = (timestamp: string) => {
   const date = new Date(parseFloat(timestamp) * 1000);
@@ -55,161 +57,244 @@ const PacketAnalyzer = () => {
   };
 
   return (
-    <div className="w-full px-4 py-6 bg-gray-50 space-y-6">
-      <header className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-        <h1 className="text-3xl font-bold text-gray-800">Packet Analyzer</h1>
-        <Button 
-          className="capture-button"
-          onClick={toggleCapturing}
-          aria-label={isCapturing ? 'Stop Capturing' : 'Resume Capturing'}
-          variant="default"
-        >
-          {isCapturing ? (
-            <>
-              <Pause className="mr-2 h-4 w-4" /> Stop Capturing
-            </>
-          ) : (
-            <>
-              <Play className="mr-2 h-4 w-4" /> Resume Capturing
-            </>
-          )}
-        </Button>
-      </header>
-
-      <div className="packet-table-container bg-white rounded-lg shadow-sm">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead>Destination</TableHead>
-              <TableHead>Protocol</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, index) => (
-                <TableRow key={`loading-${index}`}>
-                  <TableCell><Skeleton className="h-4 w-[100px]" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-[80px]" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-[200px]" /></TableCell>
-                </TableRow>
-              ))
-            ) : packets.length > 0 ? (
-              packets.map((packet, index) => (
-                <TableRow
-                  key={`packet-${index}`}
-                  className={selectedPacket === packet ? 'selected-row' : ''}
-                  onClick={() => handleSelectPacket(packet)}
-                >
-                  <TableCell>{formatTimestamp(packet.time)}</TableCell>
-                  <TableCell>
-                    <HoverCard>
-                      <HoverCardTrigger asChild>
-                        <span className="src-address">{packet.src}</span>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-80">
-                        <div className="flex justify-between space-x-4">
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-semibold">Source Address</h4>
-                            <p className="text-sm">{packet.src}</p>
-                          </div>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </TableCell>
-                  <TableCell>
-                    <HoverCard>
-                      <HoverCardTrigger asChild>
-                        <span className="dst-address">{packet.dst}</span>
-                      </HoverCardTrigger>
-                      <HoverCardContent className="w-80">
-                        <div className="flex justify-between space-x-4">
-                          <div className="space-y-1">
-                            <h4 className="text-sm font-semibold">Destination Address</h4>
-                            <p className="text-sm">{packet.dst}</p>
-                          </div>
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </TableCell>
-                  <TableCell>{packet.protocol}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={4} className="no-data">
-                  No packets captured yet.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {selectedPacket && (
-        <section className="packet-details bg-white p-4 rounded-lg shadow-sm">
-          <h2 className="text-lg font-bold text-gray-800">Packet Details</h2>
-          <div className="details-content grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="detail-card p-4 bg-gray-100 rounded-lg shadow-sm">
-              <div className="detail-item">
-                <span className="detail-label">Time:</span>
-                <span className="detail-value">{formatTimestamp(selectedPacket.time)}</span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Source:</span>
-                <span className="detail-value">{selectedPacket.src}</span>
-              </div>
-              <div className="detail-item">
-                <span className="detail-label">Destination:</span>
-                <span className="detail-value">{selectedPacket.dst}</span>
-              </div>
-            </div>
-            <div className="detail-card p-4 bg-gray-100 rounded-lg shadow-sm">
-              <div className="detail-item">
-                <span className="detail-label">Info:</span>
-                <span className="detail-value">{selectedPacket.info}</span>
-              </div>
-              {selectedPacket.protocol && (
-                <div className="detail-item">
-                  <span className="detail-label">Protocol:</span>
-                  <span className="detail-value">{selectedPacket.protocol}</span>
-                </div>
-              )}
-              {selectedPacket.length && (
-                <div className="detail-item">
-                  <span className="detail-label">Length:</span>
-                  <span className="detail-value">{selectedPacket.length} bytes</span>
-                </div>
-              )}
-              {selectedPacket.type && (
-                <div className="detail-item">
-                  <span className="detail-label">Type:</span>
-                  <span className="detail-value">{selectedPacket.type}</span>
-                </div>
-              )}
-              {selectedPacket.flags && (
-                <div className="detail-item">
-                  <span className="detail-label">Flags:</span>
-                  <span className="detail-value">{selectedPacket.flags}</span>
-                </div>
-              )}
-            </div>
+    <div className="container mx-auto px-4 py-6 space-y-6">
+      {/* Header */}
+      <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <CardHeader className="pb-2 pt-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold text-gray-800 flex items-center">
+              <Radar className="mr-2 h-6 w-6 text-blue-500" /> Packet Analyzer
+            </CardTitle>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={toggleCapturing}
+                    aria-label={isCapturing ? 'Stop capturing packets' : 'Resume capturing packets'}
+                    className={cn(
+                      "flex items-center",
+                      isCapturing ? "bg-red-500 hover:bg-red-600" : "bg-green-500 hover:bg-green-600"
+                    )}
+                  >
+                    {isCapturing ? (
+                      <>
+                        <Pause className="mr-2 h-4 w-4" /> Stop
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" /> Resume
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isCapturing ? "Stop capturing packets" : "Resume capturing packets"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
-        </section>
+          <CardDescription>Real-time network packet capture and analysis</CardDescription>
+        </CardHeader>
+      </Card>
+
+      {/* Packet Table */}
+      <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table aria-label="Captured packets table">
+              <TableHeader className="bg-gray-100">
+                <TableRow>
+                  <TableHead className="px-4 py-3 text-left font-semibold text-gray-600">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>Time</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Packet capture timestamp</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-semibold text-gray-600">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>Source</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Source IP address</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-semibold text-gray-600">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>Destination</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Destination IP address</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                  <TableHead className="px-4 py-3 text-left font-semibold text-gray-600">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>Protocol</span>
+                        </TooltipTrigger>
+                        <TooltipContent>Network protocol used</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, index) => (
+                    <TableRow key={`loading-${index}`}>
+                      <TableCell className="px-4 py-3"><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell className="px-4 py-3"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="px-4 py-3"><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell className="px-4 py-3"><Skeleton className="h-4 w-16" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : packets.length > 0 ? (
+                  packets.map((packet, index) => (
+                    <TableRow
+                      key={`packet-${index}`}
+                      className={cn(
+                        "transition-colors duration-200 cursor-pointer",
+                        selectedPacket === packet ? "bg-blue-100" : index % 2 === 0 ? "bg-white" : "bg-gray-50",
+                        selectedPacket !== packet && "hover:bg-blue-50"
+                      )}
+                      onClick={() => handleSelectPacket(packet)}
+                      role="row"
+                    >
+                      <TableCell className="px-4 py-3 text-gray-700">{formatTimestamp(packet.time)}</TableCell>
+                      <TableCell className="px-4 py-3 text-gray-700">
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <span className="font-mono">{packet.src}</span>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-64">
+                            <h4 className="text-sm font-semibold">Source Address</h4>
+                            <p className="text-sm font-mono">{packet.src}</p>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-gray-700">
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <span className="font-mono">{packet.dst}</span>
+                          </HoverCardTrigger>
+                          <HoverCardContent className="w-64">
+                            <h4 className="text-sm font-semibold">Destination Address</h4>
+                            <p className="text-sm font-mono">{packet.dst}</p>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-gray-700">{packet.protocol}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-8 text-center text-gray-500">
+                      <div className="flex flex-col items-center">
+                        <Network className="h-8 w-8 mb-2" aria-hidden="true" />
+                        <span>No packets captured yet.</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Packet Details */}
+      {selectedPacket && (
+        <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 animate-in fade-in">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-800">Packet Details</CardTitle>
+            <CardDescription>Detailed information about the selected packet</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold text-gray-600">Time:</span>
+                  <span className="text-sm text-gray-700">{formatTimestamp(selectedPacket.time)}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold text-gray-600">Source:</span>
+                  <span className="text-sm font-mono text-gray-700">{selectedPacket.src}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold text-gray-600">Destination:</span>
+                  <span className="text-sm font-mono text-gray-700">{selectedPacket.dst}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-semibold text-gray-600">Info:</span>
+                  <span className="text-sm text-gray-700">{selectedPacket.info}</span>
+                </div>
+                {selectedPacket.protocol && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-semibold text-gray-600">Protocol:</span>
+                    <span className="text-sm text-gray-700">{selectedPacket.protocol}</span>
+                  </div>
+                )}
+                {selectedPacket.length && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-semibold text-gray-600">Length:</span>
+                    <span className="text-sm text-gray-700">{selectedPacket.length} bytes</span>
+                  </div>
+                )}
+                {selectedPacket.type && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-semibold text-gray-600">Type:</span>
+                    <span className="text-sm text-gray-700">{selectedPacket.type}</span>
+                  </div>
+                )}
+                {selectedPacket.flags && (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-semibold text-gray-600">Flags:</span>
+                    <span className="text-sm text-gray-700">{selectedPacket.flags}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
-      <footer className="status-bar bg-white p-4 rounded-lg shadow-sm flex justify-between items-center">
-        <div className="status-indicator flex items-center">
-          <span className={`status-dot ${isCapturing ? 'active' : 'inactive'}`}></span>
-          <span className="status-text">{isCapturing ? 'Capturing' : 'Paused'}</span>
-        </div>
-
-        <div className="packet-count font-semibold text-gray-800">
-          {packets.length} packet{packets.length !== 1 ? 's' : ''} captured
-        </div>
-      </footer>
+      {/* Status Bar */}
+      <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <CardContent className="flex justify-between items-center p-4">
+          <div className="flex items-center space-x-2">
+            <span
+              className={cn(
+                "h-2 w-2 rounded-full transition-colors duration-300",
+                isCapturing ? "bg-green-500" : "bg-red-500"
+              )}
+              aria-hidden="true"
+            />
+            <span className="text-sm text-gray-700">
+              {isCapturing ? 'Capturing packets' : 'Capture paused'}
+            </span>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="text-sm font-semibold text-gray-800">
+                  {packets.length} packet{packets.length !== 1 ? 's' : ''} captured
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Total packets captured in this session</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </CardContent>
+      </Card>
     </div>
   );
 };
