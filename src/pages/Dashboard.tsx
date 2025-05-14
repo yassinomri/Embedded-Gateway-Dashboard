@@ -34,6 +34,7 @@ import { SystemStatusCard } from "@/components/SystemStatusCard";
 import { ArrowUpDown } from "lucide-react";
 import { BandwidthUsageCard } from "@/components/BandwidthUsageCard";
 import { ConnectedDevicesCard } from "@/components/ConnectedDevicesCard";
+import { NetworkInterfacesCard } from "@/components/NetworkInterfacesCard";
 
 // Memoize chart components to prevent unnecessary re-renders
 
@@ -619,50 +620,9 @@ export default function Dashboard() {
 
 
                 {/* Network Interfaces Section */}
-          <Card className="col-span-4">
-            <CardHeader>
-              <CardTitle>
-                <div className="flex items-center">
-                  <Network className="mr-2 h-5 w-5" /> Network Interfaces
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {networkInterfaces.length > 0 ? (
-                <div className="overflow-y-auto max-h-96">
-                  <table className="table-auto w-full text-sm border-collapse border border-gray-300">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 border border-gray-300">Interface</th>
-                        <th className="px-4 py-2 border border-gray-300">MAC Address</th>
-                        <th className="px-4 py-2 border border-gray-300">IPv4</th>
-                        <th className="px-4 py-2 border border-gray-300">IPv6</th>
-                        <th className="px-4 py-2 border border-gray-300">RX Bytes</th>
-                        <th className="px-4 py-2 border border-gray-300">TX Bytes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {networkInterfaces.map((iface, index) => (
-                        <tr
-                          key={index}
-                          className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                        >
-                          <td className="px-4 py-2 border border-gray-300">{iface.name}</td>
-                          <td className="px-4 py-2 border border-gray-300">{iface.mac}</td>
-                          <td className="px-4 py-2 border border-gray-300">{iface.ipv4}</td>
-                          <td className="px-4 py-2 border border-gray-300">{iface.ipv6}</td>
-                          <td className="px-4 py-2 border border-gray-300">{iface.rxBytes}</td>
-                          <td className="px-4 py-2 border border-gray-300">{iface.txBytes}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p>No network interfaces found.</p>
-              )}
-            </CardContent>
-          </Card>
+          <NetworkInterfacesCard 
+            networkInterfaces={networkInterfaces}
+          />
 
           {/* Active Connections */}
           <Card className="col-span-4"> {/* Adjust grid span to give more space */}
