@@ -583,7 +583,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-2">
                 <CardTitle>
                   <div className="flex items-center">
-                    <Server className="mr-2 h-5 w-5" /> System Status
+                    <Server className="mr-2 h-5 w-5  text-blue-500" /> System Status
                   </div>
                 </CardTitle>
               </div>
