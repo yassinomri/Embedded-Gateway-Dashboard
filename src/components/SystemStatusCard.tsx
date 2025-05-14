@@ -4,7 +4,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Server, ArrowRight, MemoryStick, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { memo } from 'react';
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
@@ -56,7 +55,6 @@ export function SystemStatusCard({
   loadAverage,
   formatMemory
 }: SystemStatusCardProps) {
-  const navigate = useNavigate();
 
   return (
     <Card className={cn("flex flex-col w-full max-w-lg mx-auto shadow-lg hover:shadow-xl transition-shadow duration-300", className)}>
