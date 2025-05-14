@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useMemo, Suspense, memo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { apiClient } from "@/lib/dashboard-api";
 import { NetworkInterface } from "@/types/dashboard-data";
 import { 
@@ -9,9 +8,6 @@ import {
   PowerIcon, 
   Network, 
   Wifi, 
-  Shield, 
-  Server, 
-  Activity, 
   Smartphone 
 } from "lucide-react";
 import { SyncManager } from "@/components/SyncManager";
@@ -34,13 +30,10 @@ import { debounce } from "lodash";
 import { NetworkQualityCard } from "@/components/NetworkQualityCard";
 import { SpeedTestCard } from "@/components/SpeedTestCard";
 import { FirewallStatusCard } from "@/components/FirewallStatusCard";
-import { cn } from "@/lib/utils";
+import { SystemStatusCard } from "@/components/SystemStatusCard";
 import { ArrowUpDown } from "lucide-react";
 
 // Memoize chart components to prevent unnecessary re-renders
-const MemoizedDoughnut = memo(React.lazy(() => 
-  import("react-chartjs-2").then((module) => ({ default: module.Doughnut }))
-));
 
 const MemoizedLine = memo(React.lazy(() => 
   import("react-chartjs-2").then((module) => ({ default: module.Line }))
@@ -578,93 +571,23 @@ export default function Dashboard() {
         /* Regular dashboard content when online */
         <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-4">
           {/* System Status - Left Side (2 columns wide) */}
-          <Card className={cn("flex flex-col", "lg:col-span-2")}>
-            <CardHeader>
-              <div className="flex items-center space-x-2">
-                <CardTitle>
-                  <div className="flex items-center">
-                    <Server className="mr-2 h-5 w-5  text-blue-500" /> System Status
-                  </div>
-                </CardTitle>
-              </div>
-              <CardDescription></CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex justify-between items-center">
-                {/* Memory Usage Chart */}
-                <div className="w-1/2">
-                  <Suspense fallback={<ChartSkeleton />}>
-                    <MemoizedDoughnut 
-                      data={memoryChartData} 
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                          legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                              boxWidth: 12,
-                              padding: 8
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Suspense>
-                  <p className="text-center text-sm mt-2">Memory Usage %</p>
-                </div>
-
-                {/* CPU Usage Chart */}
-                <div className="w-1/2">
-                  <Suspense fallback={<ChartSkeleton />}>
-                    <MemoizedDoughnut 
-                      data={cpuChartData} 
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                          legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: {
-                              boxWidth: 12,
-                              padding: 8
-                            }
-                          }
-                        }
-                      }}
-                    />
-                  </Suspense>
-                  <p className="text-center text-sm mt-2">CPU Usage %</p>
-                </div>
-              </div>
-
-              {/* Additional System Info */}
-              <div className="mt-8 space-y-2">
-                <p>
-                  <span className="text-base font-normal">Total Memory:</span>
-                  <span className="text-lg ml-2 font-medium">{formatMemory(totalMemory)}</span>
-                </p>
-                <p>
-                  <span className="text-base font-normal">Free Memory:</span>
-                  <span className="text-lg ml-2 font-medium">{formatMemory(freeMemory)}</span>
-                </p>
-                <p>
-                  <span className="text-base font-normal">Used Memory:</span>
-                  <span className="text-lg ml-2 font-medium">{formatMemory(usedMemory)}</span>
-                </p>
-                <p>
-                  <span className="text-base font-normal">CPU Usage:</span>
-                  <span className="text-lg ml-2 font-medium">{cpuUsageData.usage}%</span>
-                </p>
-                <p>
-                  <span className="text-base font-normal">Load Average:</span>
-                  <span className="text-lg ml-2 font-medium">{loadAverage}</span>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <SystemStatusCard 
+            className="lg:col-span-2"
+            memoryChartData={memoryChartData && {
+              ...memoryChartData,
+              datasets: memoryChartData.datasets.map(dataset => ({
+                ...dataset,
+                data: dataset.data.map(value => Number(value))
+              }))
+            }}
+            cpuChartData={cpuChartData}
+            totalMemory={totalMemory}
+            freeMemory={freeMemory}
+            usedMemory={usedMemory}
+            cpuUsageData={{usage: Number(cpuUsageData.usage)}}
+            loadAverage={loadAverage}
+            formatMemory={formatMemory}
+          />
 
           {/* Right Side Cards (2 columns wide) */}
           <div className="lg:col-span-2 flex flex-col gap-4 h-full">
