@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Activity, RefreshCw } from "lucide-react";
+import { Activity, Play, RefreshCw } from "lucide-react";
 import { runSpeedTest, SpeedTestResult } from '../lib/speed-test-api';
 import { Progress } from './ui/progress';
 
@@ -35,11 +35,15 @@ export function SpeedTestCard() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center">
-          <Activity className="mr-2 h-4 w-4" /> Internet Speed
-        </CardTitle>
+        <div className="flex items-center space-x-2">
+          <CardTitle>
+            <div className="flex items-center">
+              <Activity className="mr-2 h-5 w-5" /> Internet Speed
+            </div>
+          </CardTitle>
+        </div>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="pt-4">
         {error && (
           <div className="text-red-500 text-sm mb-2">{error}</div>
         )}
@@ -94,36 +98,37 @@ export function SpeedTestCard() {
           )}
         </div>
         
-        {/* Last Test Time */}
-        {result && (
-          <div className="mt-2 text-xs text-gray-500">
-            Last test: {new Date(result.time).toLocaleString()}
+        {/* Last Test Time and Run Test Button */}
+        <div className="mt-3 flex items-center justify-between">
+          <div className="text-xs text-gray-500">
+            {result && `Last test: ${new Date(result.time).toLocaleString()}`}
           </div>
-        )}
-        
-        {/* Run Test Button */}
-        <Button
-          onClick={handleRunTest}
-          disabled={isRunning}
-          className="w-full mt-3"
-          size="sm"
-        >
-          {isRunning ? (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              Running Test...
-            </>
-          ) : (
-            <>
-              <Activity className="mr-2 h-4 w-4" />
-              Run Speed Test
-            </>
-          )}
-        </Button>
+          
+          <Button
+            onClick={handleRunTest}
+            disabled={isRunning}
+            className="w-72 mt-auto hover:bg-blue-100 hover:text-blue-700 hover:border-blue-300"
+            size="sm"
+            variant="outline"
+          >
+            {isRunning ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Running Test...
+              </>
+            ) : (
+              <>
+                <Play className="mr-2 h-4 w-4 " />
+                Run Speed Test
+              </>
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
 }
+
 
 
 
