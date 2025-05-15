@@ -52,7 +52,7 @@ const System: React.FC = () => {
         <Card className="shadow-lg">
           <CardHeader className="pb-2 pt-4">
             <div className="flex items-center justify-between">
-              <Skeleton className="h-8 w-48" />
+              <Skeleton className="h-8 w-&48" />
               <Skeleton className="h-8 w-24" />
             </div>
           </CardHeader>

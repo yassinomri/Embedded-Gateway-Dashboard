@@ -9,6 +9,10 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useEffect } from "react";
 import { startStatusChecker } from "@/lib/status-checker";
 import { NavigationRefresher } from '@/components/NavigationRefresher';
+import registerCharts from "@/components/ChartRegistration";
+
+// Register Chart.js components
+registerCharts();
 
 import Dashboard from "@/pages/Dashboard";
 import Login from "@/pages/Login";
