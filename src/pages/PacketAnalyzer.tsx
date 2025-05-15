@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { fetchCapturedPackets } from "@/lib/packet-analyzer-api";
+import React, { useState, useEffect, useCallback } from "react";
+import { fetchCapturedPackets, commonInterfaces, commonFilters } from "@/lib/packet-analyzer-api";
 import { PacketData, PacketFilterOptions, PacketStatistics } from "@/types/packet-analyzer";
 import { PacketAnalyzerTable } from "@/components/PacketAnalyzerTable";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,36 +32,7 @@ const PacketAnalyzer: React.FC = () => {
   });
   const { toast } = useToast();
 
-  useEffect(() => {
-    fetchPackets();
-  }, []);
-
-  useEffect(() => {
-    calculateStatistics();
-  }, [packets]);
-
-  const fetchPackets = async () => {
-    setLoading(true);
-    try {
-      const data = await fetchCapturedPackets(filterOptions);
-      setPackets(data);
-      toast({
-        title: "Packets Captured",
-        description: `Successfully captured ${data.length} packets`,
-      });
-    } catch (error) {
-      console.error("Error fetching packets:", error);
-      toast({
-        title: "Error",
-        description: "Failed to capture packets. Check console for details.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calculateStatistics = () => {
+  const calculateStatistics = useCallback(() => {
     if (!packets.length) return;
 
     const protocolDist: Record<string, number> = {};
@@ -84,7 +55,36 @@ const PacketAnalyzer: React.FC = () => {
       directionDistribution: directionDist,
       averagePacketSize: Math.round(totalSize / packets.length),
     });
-  };
+  }, [packets]);
+
+  const fetchPackets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await fetchCapturedPackets(filterOptions);
+      setPackets(data);
+      toast({
+        title: "Packets Captured",
+        description: `Successfully captured ${data.length} packets`,
+      });
+    } catch (error) {
+      console.error("Error fetching packets:", error);
+      toast({
+        title: "Error",
+        description: "Failed to capture packets. Check console for details.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [filterOptions, toast]);
+
+  useEffect(() => {
+    fetchPackets();
+  }, [fetchPackets]);
+
+  useEffect(() => {
+    calculateStatistics();
+  }, [calculateStatistics]);
 
   const handleFilterChange = (key: keyof PacketFilterOptions, value: string | number) => {
     setFilterOptions((prev) => ({

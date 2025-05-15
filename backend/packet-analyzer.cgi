@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# CGI headers with CORS - expanded to allow more headers
+# CGI headers with CORS
 echo "Content-type: application/json"
 echo "Access-Control-Allow-Origin: *"
 echo "Access-Control-Allow-Methods: GET, POST, OPTIONS"
@@ -16,7 +16,7 @@ fi
 # Parse query parameters
 QUERY_STRING="${QUERY_STRING:-}"
 PACKET_COUNT=10
-INTERFACE="eth0"
+INTERFACE="br-lan"  # Default to br-lan which usually bridges all interfaces
 FILTER=""
 
 # Extract parameters from query string
@@ -24,6 +24,7 @@ if [ -n "$QUERY_STRING" ]; then
   for param in $(echo "$QUERY_STRING" | tr '&' ' '); do
     key=$(echo "$param" | cut -d= -f1)
     value=$(echo "$param" | cut -d= -f2)
+    value=$(echo "$value" | sed 's/%20/ /g')  # Handle spaces in filter
     
     case "$key" in
       count) PACKET_COUNT="$value" ;;
@@ -33,13 +34,17 @@ if [ -n "$QUERY_STRING" ]; then
   done
 fi
 
-# Validate packet count (max 50 for performance)
-if [ "$PACKET_COUNT" -gt 50 ]; then
-  PACKET_COUNT=50
+# Validate packet count (max 100 for better capture)
+if [ "$PACKET_COUNT" -gt 100 ]; then
+  PACKET_COUNT=100
 fi
 
 # Log request for debugging
 echo "Request: count=$PACKET_COUNT interface=$INTERFACE filter=$FILTER" >> /tmp/packet-analyzer.log
+
+# Get available interfaces for debugging
+AVAILABLE_INTERFACES=$(ip -o link show | awk -F': ' '{print $2}')
+echo "Available interfaces: $AVAILABLE_INTERFACES" >> /tmp/packet-analyzer.log
 
 # Begin JSON array
 echo "["
@@ -52,12 +57,14 @@ TEMP_PCAP="/tmp/packet_capture.pcap"
 TEMP_ANALYSIS="/tmp/packet_analysis.txt"
 
 # Capture packets to a file for more detailed analysis
-tcpdump -i "$INTERFACE" -c "$PACKET_COUNT" -w "$TEMP_PCAP" "$FILTER" 2>/dev/null
+# Use -v for more verbose output
+tcpdump -i "$INTERFACE" -c "$PACKET_COUNT" -w "$TEMP_PCAP" "$FILTER" -v 2>>/tmp/packet-analyzer.log
 
 # Check if capture was successful
 if [ ! -s "$TEMP_PCAP" ]; then
   # Empty capture file, return empty array
   echo "]"
+  echo "Empty capture file. Check interface name and permissions." >> /tmp/packet-analyzer.log
   exit 0
 fi
 
@@ -94,6 +101,7 @@ while read -r line; do
       ICMP)
         ttl=$(echo "$line" | grep -o -E "ttl [0-9]+" | grep -o -E "[0-9]+" | head -1)
         type="Ping"
+        icmp_type=$(echo "$line" | grep -o -E "ICMP echo (request|reply)" | head -1)
         ;;
       *)
         type="$proto"
@@ -111,13 +119,37 @@ while read -r line; do
       direction="internal"
     fi
     
-    # Create info field
+    # Create human-friendly info field
     if [ "$proto" = "TCP" ] || [ "$proto" = "UDP" ]; then
-      info="$proto $src_port > $dst_port"
+      # Try to identify common services by port
+      service=""
+      case "$dst_port" in
+        80|8080) service="HTTP" ;;
+        443) service="HTTPS" ;;
+        53) service="DNS" ;;
+        22) service="SSH" ;;
+        21) service="FTP" ;;
+        25) service="SMTP" ;;
+        110) service="POP3" ;;
+        143) service="IMAP" ;;
+        3389) service="RDP" ;;
+        5900) service="VNC" ;;
+        *) service="" ;;
+      esac
+      
+      if [ -n "$service" ]; then
+        info="$service connection from $src:$src_port to $dst:$dst_port"
+      else
+        info="$proto connection from $src:$src_port to $dst:$dst_port"
+      fi
     elif [ "$proto" = "ICMP" ]; then
-      info="ICMP echo request/reply"
+      if [ -n "$icmp_type" ]; then
+        info="$icmp_type from $src to $dst"
+      else
+        info="ICMP packet from $src to $dst"
+      fi
     else
-      info="$proto packet"
+      info="$proto packet from $src to $dst"
     fi
     
     # Fallbacks
@@ -160,6 +192,7 @@ rm -f "$TEMP_PCAP" "$TEMP_ANALYSIS"
 
 # End JSON array
 echo "]"
+
 
 
 

@@ -6,6 +6,26 @@ interface FetchPacketsOptions {
   filter?: string;
 }
 
+// List of common network interfaces to try
+export const commonInterfaces = [
+  { value: "br-lan", label: "All LAN (br-lan)" },
+  { value: "eth0", label: "Ethernet (eth0)" },
+  { value: "wlan0", label: "WiFi (wlan0)" },
+  { value: "br0", label: "Bridge (br0)" },
+  { value: "eth1", label: "Secondary Ethernet (eth1)" },
+  { value: "wlan1", label: "Secondary WiFi (wlan1)" }
+];
+
+// Common packet filters
+export const commonFilters = [
+  { value: "", label: "All Traffic" },
+  { value: "icmp", label: "ICMP (Ping)" },
+  { value: "tcp", label: "TCP Traffic" },
+  { value: "udp", label: "UDP Traffic" },
+  { value: "port 53", label: "DNS (Port 53)" },
+  { value: "port 80 or port 443", label: "Web Traffic (HTTP/HTTPS)" }
+];
+
 export const fetchCapturedPackets = async (options: FetchPacketsOptions = {}): Promise<PacketData[]> => {
   try {
     // Build query parameters
@@ -23,9 +43,7 @@ export const fetchCapturedPackets = async (options: FetchPacketsOptions = {}): P
       method: 'GET',
       headers: {
         'Accept': 'application/json'
-        // Remove Cache-Control header which is causing CORS issues
       },
-      // Add timeout to prevent hanging requests
       signal: AbortSignal.timeout(15000)
     });
     
