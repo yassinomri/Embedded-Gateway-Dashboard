@@ -1,5 +1,19 @@
 #!/bin/sh
 
+# Log file for setup
+SETUP_LOG="/tmp/security_alerts_setup.log"
+
+# Function to log messages
+log() {
+  echo "$(date): $1" | tee -a $SETUP_LOG
+}
+
+log "Starting security alerts setup"
+
+# Create the security alerts CGI script
+cat > /www/cgi-bin/security_alerts.cgi << 'EOF'
+#!/bin/sh
+
 # Set content type to JSON
 echo "Content-Type: application/json"
 echo ""
@@ -99,3 +113,39 @@ elif [ "$REQUEST_METHOD" = "GET" ]; then
     jq "{alerts: .alerts | map(select(.resolved == false)) | sort_by(.timestamp) | reverse | limit($LIMIT)}" "$ALERTS_DB"
   fi
 fi
+EOF
+
+# Make the script executable
+chmod +x /www/cgi-bin/security_alerts.cgi
+log "Created and made executable: /www/cgi-bin/security_alerts.cgi"
+
+# Install jq if not already installed
+if ! command -v jq > /dev/null; then
+  log "Installing jq package for JSON processing"
+  opkg update
+  opkg install jq
+  
+  if command -v jq > /dev/null; then
+    log "jq installed successfully"
+  else
+    log "WARNING: Failed to install jq. The security alerts system may not work properly."
+  fi
+else
+  log "jq is already installed"
+fi
+
+# Create initial empty alerts database
+echo '{"alerts":[]}' > /tmp/security_alerts.json
+log "Created initial empty alerts database at /tmp/security_alerts.json"
+
+# Test the CGI script
+log "Testing the security alerts CGI script"
+TEST_RESULT=$(REQUEST_METHOD=GET QUERY_STRING="limit=1" /www/cgi-bin/security_alerts.cgi)
+if echo "$TEST_RESULT" | grep -q "alerts"; then
+  log "CGI script test successful"
+else
+  log "WARNING: CGI script test failed. Output: $TEST_RESULT"
+fi
+
+log "Security alerts setup complete"
+log "Setup log saved to $SETUP_LOG"

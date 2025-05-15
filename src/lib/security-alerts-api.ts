@@ -1,68 +1,90 @@
-import axios from 'axios';
 import { SecurityAlert } from '@/components/AlertsCard';
 
+// Base URL for API requests
 const API_BASE_URL = '/cgi-bin';
 
-export interface AddAlertParams {
-  type: SecurityAlert['type'];
-  severity: SecurityAlert['severity'];
-  message: string;
-  source?: string;
-  details?: string;
-}
+// Function to handle API errors
+const handleApiError = (error: any) => {
+  console.error('Security alerts API error:', error);
+  throw error;
+};
 
+// Security alerts API functions
 export const securityAlertsApi = {
   // Get security alerts
-  getAlerts: async (limit: number = 10, includeResolved: boolean = false): Promise<SecurityAlert[]> => {
+  async getAlerts(limit: number = 10, includeResolved: boolean = false): Promise<SecurityAlert[]> {
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/security_alerts.cgi?limit=${limit}&include_resolved=${includeResolved}`
+      const response = await fetch(
+        `${API_BASE_URL}/security_alerts.cgi?limit=${limit}&includeResolved=${includeResolved}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
       );
-      
-      if (response.data.status === 'success') {
-        return response.data.alerts || [];
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch alerts: ${response.status} ${response.statusText}`);
       }
-      
-      throw new Error(response.data.message || 'Failed to fetch alerts');
+
+      const data = await response.json();
+      return data.alerts || [];
     } catch (error) {
-      console.error('Error fetching security alerts:', error);
-      throw error;
+      handleApiError(error);
+      return [];
     }
   },
-  
-  // Add a new alert
-  addAlert: async (params: AddAlertParams): Promise<SecurityAlert> => {
+
+  // Resolve a security alert
+  async resolveAlert(id: string): Promise<boolean> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/security_alerts.cgi`, {
-        action: 'add',
-        ...params
+      const response = await fetch(`${API_BASE_URL}/security_alerts.cgi`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'resolve',
+          id,
+        }),
       });
-      
-      if (response.data.status === 'success') {
-        return response.data.alert;
+
+      if (!response.ok) {
+        throw new Error(`Failed to resolve alert: ${response.status} ${response.statusText}`);
       }
-      
-      throw new Error(response.data.message || 'Failed to add alert');
+
+      const data = await response.json();
+      return data.success || false;
     } catch (error) {
-      console.error('Error adding security alert:', error);
-      throw error;
+      handleApiError(error);
+      return false;
     }
   },
-  
-  // Mark an alert as resolved
-  resolveAlert: async (id: string): Promise<void> => {
+
+  // Delete a security alert
+  async deleteAlert(id: string): Promise<boolean> {
     try {
-      const response = await axios.post(`${API_BASE_URL}/security_alerts.cgi`, {
-        action: 'resolve',
-        id
+      const response = await fetch(`${API_BASE_URL}/security_alerts.cgi`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          id,
+        }),
       });
-      
-      if (response.data.status !== 'success') {
-        throw new Error(response.data.message || 'Failed to resolve alert');
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete alert: ${response.status} ${response.statusText}`);
       }
+
+      const data = await response.json();
+      return data.success || false;
     } catch (error) {
-      console.error('Error resolving security alert:', error);
-      throw error;
+      handleApiError(error);
+      return false;
     }
-  }
+  },
 };
