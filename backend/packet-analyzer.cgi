@@ -1,11 +1,17 @@
 #!/bin/sh
 
-# CGI headers with CORS
+# CGI headers with CORS - expanded to allow more headers
 echo "Content-type: application/json"
 echo "Access-Control-Allow-Origin: *"
-echo "Access-Control-Allow-Methods: GET, POST"
-echo "Access-Control-Allow-Headers: Content-Type"
+echo "Access-Control-Allow-Methods: GET, POST, OPTIONS"
+echo "Access-Control-Allow-Headers: Content-Type, Accept, Cache-Control, Pragma, X-Requested-With"
 echo ""
+
+# Handle OPTIONS preflight request
+if [ "$REQUEST_METHOD" = "OPTIONS" ]; then
+  # Just return headers for preflight
+  exit 0
+fi
 
 # Parse query parameters
 QUERY_STRING="${QUERY_STRING:-}"
@@ -32,6 +38,9 @@ if [ "$PACKET_COUNT" -gt 50 ]; then
   PACKET_COUNT=50
 fi
 
+# Log request for debugging
+echo "Request: count=$PACKET_COUNT interface=$INTERFACE filter=$FILTER" >> /tmp/packet-analyzer.log
+
 # Begin JSON array
 echo "["
 
@@ -45,108 +54,70 @@ TEMP_ANALYSIS="/tmp/packet_analysis.txt"
 # Capture packets to a file for more detailed analysis
 tcpdump -i "$INTERFACE" -c "$PACKET_COUNT" -w "$TEMP_PCAP" "$FILTER" 2>/dev/null
 
+# Check if capture was successful
+if [ ! -s "$TEMP_PCAP" ]; then
+  # Empty capture file, return empty array
+  echo "]"
+  exit 0
+fi
+
 # Analyze the captured packets with more detail
 tcpdump -r "$TEMP_PCAP" -nn -tt -v 2>/dev/null > "$TEMP_ANALYSIS"
 
-# Process each packet with enhanced analysis
-cat "$TEMP_ANALYSIS" | while read -r line; do
+# Process each packet
+while read -r line; do
     # Skip empty lines
     [ -z "$line" ] && continue
     
-    # Extract basic fields using shell tools
-    time=$(echo "$line" | awk '{print $1}')
+    # Extract packet details
+    time=$(echo "$line" | grep -o "^[0-9.]*" | head -1)
+    src=$(echo "$line" | grep -o -E "([0-9]{1,3}\.){3}[0-9]{1,3}(\.[0-9]+)?" | head -1)
+    dst=$(echo "$line" | grep -o -E "([0-9]{1,3}\.){3}[0-9]{1,3}(\.[0-9]+)?" | head -2 | tail -1)
+    proto=$(echo "$line" | grep -o -E "UDP|TCP|ICMP|ARP|IP" | head -1)
+    length=$(echo "$line" | grep -o -E "length [0-9]+" | grep -o -E "[0-9]+" | head -1)
     
-    # Skip lines that don't start with a timestamp
-    echo "$time" | grep -q "^[0-9]" || continue
-    
-    src=$(echo "$line" | awk '{print $3}' | sed 's/://g')
-    dst=$(echo "$line" | awk '{print $5}' | sed 's/://g')
-    proto=$(echo "$line" | grep -o -E '\b(tcp|udp|icmp|arp|ip|ipv6)\b' | head -n1)
-    length=$(echo "$line" | grep -o -E 'length [0-9]+' | awk '{print $2}')
-    flags=$(echo "$line" | grep -o '\[.*\]' | head -n1)
-    
-    # Enhanced protocol detection
-    if [ -z "$proto" ]; then
-        if echo "$line" | grep -q "ICMP"; then
-            proto="icmp"
-        elif echo "$line" | grep -q "ARP"; then
-            proto="arp"
-        elif echo "$line" | grep -q "IP6"; then
-            proto="ipv6"
-        elif echo "$line" | grep -q "IP"; then
-            proto="ip"
-        fi
-    fi
-    
-    # Extract ports for TCP/UDP
-    src_port=""
-    dst_port=""
-    if [ "$proto" = "tcp" ] || [ "$proto" = "udp" ]; then
-        src_port=$(echo "$src" | grep -o "\..*" | sed 's/\.//')
-        dst_port=$(echo "$dst" | grep -o "\..*" | sed 's/\.//')
-        src=$(echo "$src" | sed 's/\..*//')
-        dst=$(echo "$dst" | sed 's/\..*//')
-    fi
-    
-    # Enhanced packet type classification
-    if [ "$proto" = "tcp" ]; then
-        if [ "$dst_port" = "80" ] || [ "$dst_port" = "443" ]; then
-            type="Web"
-        elif [ "$dst_port" = "22" ]; then
-            type="SSH"
-        elif [ "$dst_port" = "25" ] || [ "$dst_port" = "587" ] || [ "$dst_port" = "465" ]; then
-            type="Email"
-        elif [ "$dst_port" = "53" ]; then
-            type="DNS"
-        else
-            type="TCP Data"
-        fi
-    elif [ "$proto" = "udp" ]; then
-        if [ "$dst_port" = "53" ]; then
-            type="DNS"
-        elif [ "$dst_port" = "67" ] || [ "$dst_port" = "68" ]; then
-            type="DHCP"
-        elif [ "$dst_port" = "123" ]; then
-            type="NTP"
-        else
-            type="UDP Data"
-        fi
-    elif [ "$proto" = "icmp" ]; then
-        icmp_type=$(echo "$line" | grep -o "ICMP.*" | cut -d' ' -f2)
-        if [ "$icmp_type" = "echo" ]; then
-            type="Ping"
-        else
-            type="ICMP Control"
-        fi
-    elif [ "$proto" = "arp" ]; then
-        type="Address Resolution"
-    else
-        type="Unknown"
-    fi
-    
-    # Extract TTL value
-    ttl=$(echo "$line" | grep -o "ttl [0-9]*" | awk '{print $2}')
+    # Extract more details based on protocol
+    case "$proto" in
+      TCP)
+        src_port=$(echo "$line" | grep -o -E "$src\.[0-9]+" | grep -o -E "[0-9]+$" | head -1)
+        dst_port=$(echo "$line" | grep -o -E "$dst\.[0-9]+" | grep -o -E "[0-9]+$" | head -1)
+        flags=$(echo "$line" | grep -o -E "Flags \[[^\]]+\]" | head -1)
+        ttl=$(echo "$line" | grep -o -E "ttl [0-9]+" | grep -o -E "[0-9]+" | head -1)
+        type="TCP"
+        ;;
+      UDP)
+        src_port=$(echo "$line" | grep -o -E "$src\.[0-9]+" | grep -o -E "[0-9]+$" | head -1)
+        dst_port=$(echo "$line" | grep -o -E "$dst\.[0-9]+" | grep -o -E "[0-9]+$" | head -1)
+        ttl=$(echo "$line" | grep -o -E "ttl [0-9]+" | grep -o -E "[0-9]+" | head -1)
+        type="UDP"
+        ;;
+      ICMP)
+        ttl=$(echo "$line" | grep -o -E "ttl [0-9]+" | grep -o -E "[0-9]+" | head -1)
+        type="Ping"
+        ;;
+      *)
+        type="$proto"
+        ;;
+    esac
     
     # Determine direction (inbound/outbound)
-    local_networks="192.168.0.0/16 10.0.0.0/8 172.16.0.0/12"
-    direction="unknown"
-    for network in $local_networks; do
-        if echo "$src" | grep -q "^$(echo $network | cut -d'/' -f1 | sed 's/\.[0-9]*$//')\."; then
-            if ! echo "$dst" | grep -q "^$(echo $network | cut -d'/' -f1 | sed 's/\.[0-9]*$//')\."; then
-                direction="outbound"
-                break
-            fi
-        elif echo "$dst" | grep -q "^$(echo $network | cut -d'/' -f1 | sed 's/\.[0-9]*$//')\."; then
-            direction="inbound"
-            break
-        fi
-    done
-    
-    # Generate enhanced info field
-    if [ -n "$src_port" ] && [ -n "$dst_port" ]; then
-        info="$proto $type from $src:$src_port to $dst:$dst_port"
+    if echo "$src" | grep -q -E "^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)" && 
+       ! echo "$dst" | grep -q -E "^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)"; then
+      direction="outbound"
+    elif ! echo "$src" | grep -q -E "^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)" && 
+         echo "$dst" | grep -q -E "^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)"; then
+      direction="inbound"
     else
-        info="$proto $type from $src to $dst"
+      direction="internal"
+    fi
+    
+    # Create info field
+    if [ "$proto" = "TCP" ] || [ "$proto" = "UDP" ]; then
+      info="$proto $src_port > $dst_port"
+    elif [ "$proto" = "ICMP" ]; then
+      info="ICMP echo request/reply"
+    else
+      info="$proto packet"
     fi
     
     # Fallbacks
@@ -182,13 +153,15 @@ cat "$TEMP_ANALYSIS" | while read -r line; do
 EOF
 
     count=$((count + 1))
-done
+done < "$TEMP_ANALYSIS"
 
 # Clean up temporary files
 rm -f "$TEMP_PCAP" "$TEMP_ANALYSIS"
 
 # End JSON array
 echo "]"
+
+
 
 
 

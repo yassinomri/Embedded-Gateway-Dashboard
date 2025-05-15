@@ -17,13 +17,37 @@ export const fetchCapturedPackets = async (options: FetchPacketsOptions = {}): P
     const queryString = params.toString();
     const url = `http://192.168.1.2/cgi-bin/packet-analyzer.cgi${queryString ? `?${queryString}` : ''}`;
     
-    const response = await fetch(url);
+    console.log(`Fetching packets from: ${url}`);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+        // Remove Cache-Control header which is causing CORS issues
+      },
+      // Add timeout to prevent hanging requests
+      signal: AbortSignal.timeout(15000)
+    });
+    
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await response.json();
-    return data;
+    const responseText = await response.text();
+    console.log("Raw response:", responseText.substring(0, 200) + "...");
+    
+    if (!responseText || responseText.trim() === '') {
+      console.warn("Empty response received from packet analyzer API");
+      return getMockPacketData();
+    }
+    
+    try {
+      const data = JSON.parse(responseText);
+      return data;
+    } catch (parseError) {
+      console.error("JSON parse error:", parseError);
+      throw new Error(`Failed to parse response: ${parseError}`);
+    }
   } catch (error) {
     console.error("Error fetching captured packets:", error);
     
