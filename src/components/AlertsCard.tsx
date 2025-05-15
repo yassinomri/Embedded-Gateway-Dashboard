@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Shield, Wifi, Clock, ExternalLink } from "lucide-react";
+import { AlertTriangle, Shield, Wifi, Clock, ExternalLink, Network, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,34 +32,31 @@ export function AlertsCard({
 }: AlertsCardProps) {
   const navigate = useNavigate();
   
-  // Get alert icon based on type
-  const getAlertIcon = (type: SecurityAlert['type']) => {
-    switch (type) {
-      case 'firewall':
-        return <Shield className="h-5 w-5" />;
+  // Add alert type icons based on the alert type
+  const getAlertIcon = (type: string) => {
+    switch (type.toLowerCase()) {
       case 'wifi':
-        return <Wifi className="h-5 w-5" />;
+        return <Wifi className="h-5 w-5 text-orange-500" />;
       case 'network':
-        return <ExternalLink className="h-5 w-5" />;
-      case 'system':
+        return <Network className="h-5 w-5 text-blue-500" />;
+      case 'security':
+        return <ShieldAlert className="h-5 w-5 text-red-500" />;
       default:
-        return <AlertTriangle className="h-5 w-5" />;
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
     }
   };
-  
-  // Get alert color based on severity
-  const getAlertColor = (severity: SecurityAlert['severity']) => {
-    switch (severity) {
-      case 'low':
-        return 'bg-blue-50 border-blue-200 text-blue-800';
-      case 'medium':
-        return 'bg-yellow-50 border-yellow-200 text-yellow-800';
+
+  // Add alert type colors based on severity
+  const getSeverityColor = (severity: string) => {
+    switch (severity.toLowerCase()) {
       case 'high':
-        return 'bg-orange-50 border-orange-200 text-orange-800';
-      case 'critical':
-        return 'bg-red-50 border-red-200 text-red-800';
+        return 'bg-red-100 text-red-800 border-red-300';
+      case 'medium':
+        return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'low':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-300';
       default:
-        return 'bg-gray-50 border-gray-200 text-gray-800';
+        return 'bg-gray-100 text-gray-800 border-gray-300';
     }
   };
 
@@ -88,7 +85,7 @@ export function AlertsCard({
             {alerts.map((alert) => (
               <Alert 
                 key={alert.id} 
-                className={cn("border-l-4", getAlertColor(alert.severity))}
+                className={cn("border-l-4", getSeverityColor(alert.severity))}
               >
                 <div className="flex items-start">
                   <div className={`p-1 mr-3 rounded-full ${alert.severity === 'critical' ? 'text-red-500' : alert.severity === 'high' ? 'text-orange-500' : alert.severity === 'medium' ? 'text-yellow-500' : 'text-blue-500'}`}>
@@ -143,4 +140,5 @@ export function AlertsCard({
     </Card>
   );
 }
+
 

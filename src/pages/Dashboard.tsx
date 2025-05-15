@@ -151,7 +151,7 @@ export default function Dashboard() {
   const [, setHistoricalData] = useState([]);
   const [eth0BandwidthHistory, setEth0BandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
   const [wifiBandwidthHistory, setWifiBandwidthHistory] = useState<InterfaceBandwidthHistory[]>([]);
-  const [selectedInterfaces, setSelectedInterfaces] = useState({
+  const [selectedInterfaces] = useState({
     ethernet: "eth0",
     wifi: "phy0-ap0"
   });

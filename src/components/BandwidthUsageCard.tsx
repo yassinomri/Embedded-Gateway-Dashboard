@@ -3,10 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ArrowUpDown, Network, Wifi, ArrowRight, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ChartData, Point } from 'chart.js';
-import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // Memoize chart components to prevent unnecessary re-renders
