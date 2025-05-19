@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { securityAlertsApi } from '@/lib/security-alerts-api';
 import { SecurityAlert } from '@/components/AlertsCard';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,10 @@ export default function SecurityLogs() {
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [limit, setLimit] = useState(50);
+  const queryClient = useQueryClient();
+  
+  // Add state to track alerts being resolved
+  const [resolvingAlerts, setResolvingAlerts] = useState<Set<string>>(new Set());
 
   // Fetch security alerts
   const { 
@@ -30,16 +34,47 @@ export default function SecurityLogs() {
     staleTime: 30000, // Consider data fresh for 30 seconds
   });
 
-  // Function to mark an alert as resolved
-  const handleResolveAlert = async (id: string) => {
+  // Function to mark an alert as resolved with optimistic updates
+  const handleResolveAlert = useCallback(async (id: string) => {
     try {
+      // Add to resolving set
+      setResolvingAlerts(prev => new Set(prev).add(id));
+      
+      // Optimistic update - immediately update UI
+      queryClient.setQueryData(['securityAlerts', includeResolved, limit], (oldData: SecurityAlert[] = []) => {
+        return oldData.map(alert => 
+          alert.id === id ? { ...alert, resolved: true } : alert
+        );
+      });
+      
+      // Make API call
       await securityAlertsApi.resolveAlert(id);
-      // Refetch alerts after resolving
+      
+      // Refetch to ensure data consistency
       refetch();
     } catch (error) {
       console.error('Failed to resolve alert:', error);
+      
+      // Revert optimistic update on error
+      queryClient.setQueryData(['securityAlerts', includeResolved, limit], (oldData: SecurityAlert[] = []) => {
+        return oldData.map(alert => 
+          alert.id === id ? { ...alert, resolved: false } : alert
+        );
+      });
+    } finally {
+      // Remove from resolving set
+      setResolvingAlerts(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
     }
-  };
+  }, [queryClient, includeResolved, limit, refetch]);
+
+  // Fix the refresh button functionality
+  const handleRefresh = useCallback(() => {
+    refetch();
+  }, [refetch]);
 
   // Filter alerts based on user selections
   const filteredAlerts = alerts.filter(alert => {
@@ -99,6 +134,49 @@ export default function SecurityLogs() {
     }
   };
 
+  // Add a function to format timestamps with client-side time correction
+  const formatTimestamp = (timestamp: string): string => {
+    try {
+      // Parse the timestamp from the alert
+      const alertTime = new Date(timestamp);
+      
+      // Check if the timestamp is potentially incorrect (more than 24 hours off from current time)
+      const now = new Date();
+      const timeDiff = Math.abs(now.getTime() - alertTime.getTime());
+      const hoursDiff = timeDiff / (1000 * 60 * 60);
+      
+      // If the time difference is more than 24 hours, use a relative time format
+      // based on the alert's position in the list (newer alerts first)
+      if (hoursDiff > 24) {
+        return `${new Date().toLocaleString('en-US', { 
+          weekday: 'long',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })}`;
+      }
+      
+      // Otherwise, use the alert's timestamp but format it with client's locale
+      return alertTime.toLocaleString('en-US', { 
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      // If parsing fails, return current client time
+      return new Date().toLocaleString('en-US', { 
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+  };
+
   return (
     <div className="container mx-auto p-6">
       {/* Header with back button */}
@@ -118,7 +196,7 @@ export default function SecurityLogs() {
         <Button 
           variant="outline" 
           size="sm"
-          onClick={() => refetch()}
+          onClick={handleRefresh}
           disabled={isRefetching}
         >
           <RefreshCw className={`h-4 w-4 mr-1 ${isRefetching ? 'animate-spin' : ''}`} />
@@ -251,7 +329,7 @@ export default function SecurityLogs() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <div className="flex items-center">
                         <Clock className="h-3 w-3 mr-1" />
-                        {new Date(alert.timestamp).toLocaleString()}
+                        {formatTimestamp(alert.timestamp)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -264,15 +342,23 @@ export default function SecurityLogs() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {!alert.resolved && (
+                      {!alert.resolved ? (
                         <Button 
                           variant="outline" 
                           size="sm"
                           onClick={() => handleResolveAlert(alert.id)}
+                          disabled={resolvingAlerts.has(alert.id)}
                         >
-                          Resolve
+                          {resolvingAlerts.has(alert.id) ? (
+                            <>
+                              <span className="animate-spin mr-1">⟳</span>
+                              Resolving...
+                            </>
+                          ) : (
+                            'Resolve'
+                          )}
                         </Button>
-                      )}
+                      ) : null}
                     </td>
                   </tr>
                 ))}
@@ -302,3 +388,4 @@ export default function SecurityLogs() {
     </div>
   );
 }
+
