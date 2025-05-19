@@ -84,8 +84,8 @@ export function BandwidthUsageCard({
               <CardDescription>
                 {eth0BandwidthHistory.length > 0 ? (
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Download: {eth0BandwidthHistory[eth0BandwidthHistory.length - 1]?.downloadRate.toFixed(2)} Mbps</span>
-                    <span>Upload: {eth0BandwidthHistory[eth0BandwidthHistory.length - 1]?.uploadRate.toFixed(2)} Mbps</span>
+                    <span>Download: {(eth0BandwidthHistory[eth0BandwidthHistory.length - 1]?.downloadRate * 60).toFixed(2)} Mbpm</span>
+                    <span>Upload: {(eth0BandwidthHistory[eth0BandwidthHistory.length - 1]?.uploadRate * 60).toFixed(2)} Mbpm</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">No data available</span>
@@ -110,7 +110,7 @@ export function BandwidthUsageCard({
                                     beginAtZero: true,
                                     title: {
                                       display: true,
-                                      text: 'Mbps',
+                                      text: 'Mbpm',
                                       font: { size: 12 }
                                     },
                                     grid: { color: 'rgba(0,0,0,0.1)' }
@@ -123,7 +123,7 @@ export function BandwidthUsageCard({
                                   tooltip: {
                                     enabled: true,
                                     callbacks: {
-                                      label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)} Mbps`
+                                      label: (context) => `${context.dataset.label}: ${(context.parsed.y * 60).toFixed(2)} Mbpm`
                                     }
                                   },
                                   datalabels: { display: false },
@@ -160,8 +160,8 @@ export function BandwidthUsageCard({
               <CardDescription>
                 {wifiBandwidthHistory.length > 0 ? (
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Download: {wifiBandwidthHistory[wifiBandwidthHistory.length - 1]?.downloadRate.toFixed(2)} Mbps</span>
-                    <span>Upload: {wifiBandwidthHistory[wifiBandwidthHistory.length - 1]?.uploadRate.toFixed(2)} Mbps</span>
+                    <span>Download: {(wifiBandwidthHistory[wifiBandwidthHistory.length - 1]?.downloadRate * 60).toFixed(2)} Mbpm</span>
+                    <span>Upload: {(wifiBandwidthHistory[wifiBandwidthHistory.length - 1]?.uploadRate * 60).toFixed(2)} Mbpm</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">No data available</span>
@@ -186,7 +186,7 @@ export function BandwidthUsageCard({
                                     beginAtZero: true,
                                     title: {
                                       display: true,
-                                      text: 'Mbps',
+                                      text: 'Mbpm',
                                       font: { size: 12 }
                                     },
                                     grid: { color: 'rgba(0,0,0,0.1)' }
@@ -199,7 +199,7 @@ export function BandwidthUsageCard({
                                   tooltip: {
                                     enabled: true,
                                     callbacks: {
-                                      label: (context) => `${context.dataset.label}: ${context.parsed.y.toFixed(2)} Mbps`
+                                      label: (context) => `${context.dataset.label}: ${(context.parsed.y * 60).toFixed(2)} Mbpm`
                                     }
                                   },
                                   datalabels: { display: false },
@@ -231,3 +231,4 @@ export function BandwidthUsageCard({
     </Card>
   );
 }
+

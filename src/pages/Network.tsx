@@ -543,7 +543,6 @@ export default function Network() {
               </TooltipProvider>
             )}
           </div>
-          <CardDescription>Manage network interfaces, wireless settings, and DHCP/DNS configurations</CardDescription>
         </CardHeader>
       </Card>
       <Tabs defaultValue="interfaces" className="space-y-4">

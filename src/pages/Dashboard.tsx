@@ -116,10 +116,11 @@ export default function Dashboard() {
         throw err;
       }
     },
-    staleTime: 30000, // Consider data fresh for 30 seconds
+    staleTime: 60000, // Consider data fresh for 1 minute
     gcTime: 5 * 60 * 1000, // Cache for 5 minutes
     refetchOnWindowFocus: false, // Don't refetch when window regains focus
     retry: 1, // Only retry once on failure
+    refetchInterval: 60000, // Refetch every minute
     // Only fetch if system is online
     enabled: systemOnline,
   });
@@ -163,6 +164,7 @@ export default function Dashboard() {
   const calculateBandwidthRate = useCallback((bytesNow: number, bytesBefore: number, timeElapsedMs: number): number => {
     if (!bytesNow || !bytesBefore || !timeElapsedMs) return 0;
     // Convert bytes to bits and time to seconds, then to Mbps
+    // We're keeping the same calculation but the display will show it as Mbpm
     return ((bytesNow - bytesBefore) * 8) / (timeElapsedMs / 1000) / 1000000;
   }, []);
 
@@ -259,7 +261,7 @@ export default function Dashboard() {
             }
           }));
         }
-      }, 500),
+      }, 60000), // Change from 500 to 60000 for once per minute
     [calculateBandwidthRate]
   );
 

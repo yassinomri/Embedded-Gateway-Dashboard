@@ -11,8 +11,10 @@ interface PerformanceChartProps {
 }
 
 const PerformanceChart: React.FC<PerformanceChartProps> = ({ history }) => {
+  // Update the formatTime function to handle timezone correctly
   const formatTime = useCallback((time: string) => {
     const date = new Date(time);
+    // Use local time formatting instead of UTC
     return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
   }, []);
 
@@ -31,6 +33,10 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ history }) => {
         <Tooltip
           contentStyle={{ backgroundColor: '#fff', borderRadius: '6px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
           labelStyle={{ fontWeight: 'bold', marginBottom: '8px' }}
+          labelFormatter={(value) => {
+            const date = new Date(value);
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          }}
         />
         <Line type="monotone" dataKey="latency" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Latency (ms)" />
         <Line type="monotone" dataKey="packetLoss" stroke="#d97706" strokeWidth={2} dot={{ r: 3 }} name="Packet Loss (%)" />

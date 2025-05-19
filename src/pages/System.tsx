@@ -23,6 +23,36 @@ const System: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [clientDate, setClientDate] = useState<string>(
+    new Date().toLocaleString('en-US', { 
+      weekday: 'long',  // Add day name (e.g., "Monday")
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit', 
+      second: '2-digit'
+    })
+  );
+
+  // Update client date every second with the new format
+  useEffect(() => {
+    const dateInterval = setInterval(() => {
+      setClientDate(
+        new Date().toLocaleString('en-US', { 
+          weekday: 'long',  // Add day name (e.g., "Monday")
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit', 
+          minute: '2-digit', 
+          second: '2-digit'
+        })
+      );
+    }, 1000);
+    
+    return () => clearInterval(dateInterval);
+  }, []);
 
   const fetchSystemInfo = () => {
     setRefreshing(true);
@@ -131,7 +161,6 @@ const System: React.FC = () => {
               </Tooltip>
             </TooltipProvider>
           </div>
-          <CardDescription>Overview of system hardware and performance metrics</CardDescription>
         </CardHeader>
       </Card>
 
@@ -154,7 +183,7 @@ const System: React.FC = () => {
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm font-medium text-gray-600">Date:</span>
-              <span className="text-sm text-gray-700">{systemInfo?.Date || "N/A"}</span>
+              <span className="text-sm text-gray-700">{clientDate}</span>
             </div>
           </CardContent>
         </Card>

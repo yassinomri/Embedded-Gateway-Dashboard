@@ -179,7 +179,6 @@ const PacketAnalyzer: React.FC = () => {
               <Radar className="mr-2 h-6 w-6 text-blue-500" />
               Network Packet Analyzer
             </CardTitle>
-            <CardDescription>Real-time capture and analysis of network traffic</CardDescription>
           </CardHeader>
           <CardContent>
             {/* Filter Controls */}
