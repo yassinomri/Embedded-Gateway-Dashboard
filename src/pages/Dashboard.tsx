@@ -163,9 +163,10 @@ export default function Dashboard() {
   // Function to calculate bandwidth rates from bytes
   const calculateBandwidthRate = useCallback((bytesNow: number, bytesBefore: number, timeElapsedMs: number): number => {
     if (!bytesNow || !bytesBefore || !timeElapsedMs) return 0;
-    // Convert bytes to bits and time to seconds, then to Mbps
-    // We're keeping the same calculation but the display will show it as Mbpm
-    return ((bytesNow - bytesBefore) * 8) / (timeElapsedMs / 1000) / 1000000;
+    // Calculate rate: (bytesNow - bytesBefore) * 8 / (timeElapsedMs / 1000) / 1000000
+    const rate = ((bytesNow - bytesBefore) * 8) / (timeElapsedMs / 1000) / 1000000;
+    // Return 0 if rate is negative
+    return Math.max(0, rate);
   }, []);
 
   // Fetch bandwidth history only once on component mount
@@ -173,95 +174,101 @@ export default function Dashboard() {
     () =>
       debounce((interfaces, prevValues, selected) => {
         if (!interfaces || interfaces.length === 0) return;
-        
+
         const now = Date.now();
-        const eth0Interface = interfaces.find(iface => iface.name === selected.ethernet);
-        const wifiInterface = interfaces.find(iface => iface.name === selected.wifi);
-        
+        const eth0Interface = interfaces.find((iface) => iface.name === selected.ethernet);
+        const wifiInterface = interfaces.find((iface) => iface.name === selected.wifi);
+
         // Process ethernet interface
         if (eth0Interface) {
-          const rxBytes = parseInt(eth0Interface.rxBytes.replace(/[^0-9]/g, ''), 10);
-          const txBytes = parseInt(eth0Interface.txBytes.replace(/[^0-9]/g, ''), 10);
-          
+          const rxBytes = parseInt(eth0Interface.rxBytes.replace(/[^0-9]/g, '') || '0', 10);
+          const txBytes = parseInt(eth0Interface.txBytes.replace(/[^0-9]/g, '') || '0', 10);
+
           if (prevValues[selected.ethernet]) {
             const prev = prevValues[selected.ethernet];
             const timeElapsed = now - prev.timestamp;
-            
+
             if (timeElapsed > 0) {
-              const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
-              const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
-              
-              // Only add new entry if rates are valid
-              if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
-                const newEntry = {
-                  time: new Date().toISOString(),
-                  downloadRate,
-                  uploadRate,
-                  interface: selected.ethernet
-                };
-                
-                setEth0BandwidthHistory(prev => {
-                  const newHistory = [...prev, newEntry];
-                  // Keep only the last 50 entries
-                  return newHistory.slice(-50);
-                });
+              // Skip if byte counters decreased (possible reset)
+              if (rxBytes < prev.rxBytes || txBytes < prev.txBytes) {
+                console.warn(`Counter reset detected for ${selected.ethernet}: rxBytes=${rxBytes}, prevRxBytes=${prev.rxBytes}, txBytes=${txBytes}, prevTxBytes=${prev.txBytes}`);
+              } else {
+                const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
+                const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
+
+                if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
+                  const newEntry = {
+                    time: new Date().toISOString(),
+                    downloadRate,
+                    uploadRate,
+                    interface: selected.ethernet,
+                  };
+
+                  setEth0BandwidthHistory((prev) => {
+                    const newHistory = [...prev, newEntry];
+                    return newHistory.slice(-50);
+                  });
+                }
               }
             }
           }
-          
+
           // Update previous values
-          setInterfacePrevValues(prev => ({
+          setInterfacePrevValues((prev) => ({
             ...prev,
             [selected.ethernet]: {
               rxBytes,
               txBytes,
-              timestamp: now
-            }
+              timestamp: now,
+            },
           }));
         }
-        
+
         // Process WiFi interface
         if (wifiInterface) {
-          const rxBytes = parseInt(wifiInterface.rxBytes.replace(/[^0-9]/g, ''), 10);
-          const txBytes = parseInt(wifiInterface.txBytes.replace(/[^0-9]/g, ''), 10);
-          
+          const rxBytes = parseInt(wifiInterface.rxBytes.replace(/[^0-9]/g, '') || '0', 10);
+          const txBytes = parseInt(wifiInterface.txBytes.replace(/[^0-9]/g, '') || '0', 10);
+
           if (prevValues[selected.wifi]) {
             const prev = prevValues[selected.wifi];
             const timeElapsed = now - prev.timestamp;
-            
+
             if (timeElapsed > 0) {
-              const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
-              const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
-              
-              // Only add new entry if rates are valid
-              if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
-                const newEntry = {
-                  time: new Date().toISOString(),
-                  downloadRate,
-                  uploadRate,
-                  interface: selected.wifi
-                };
-                
-                setWifiBandwidthHistory(prev => {
-                  const newHistory = [...prev, newEntry];
-                  // Keep only the last 50 entries
-                  return newHistory.slice(-50);
-                });
+              // Skip if byte counters decreased (possible reset)
+              if (rxBytes < prev.rxBytes || txBytes < prev.txBytes) {
+                console.warn(`Counter reset detected for ${selected.wifi}: rxBytes=${rxBytes}, prevRxBytes=${prev.rxBytes}, txBytes=${txBytes}, prevTxBytes=${prev.txBytes}`);
+              } else {
+                const downloadRate = calculateBandwidthRate(rxBytes, prev.rxBytes, timeElapsed);
+                const uploadRate = calculateBandwidthRate(txBytes, prev.txBytes, timeElapsed);
+
+                if (!isNaN(downloadRate) && !isNaN(uploadRate)) {
+                  const newEntry = {
+                    time: new Date().toISOString(),
+                    downloadRate,
+                    uploadRate,
+                    interface: selected.wifi,
+                  };
+
+                  setWifiBandwidthHistory((prev) => {
+                    const newHistory = [...prev, newEntry];
+                    return newHistory.slice(-50);
+                  });
+                }
               }
             }
           }
-          
+
           // Update previous values
-          setInterfacePrevValues(prev => ({
+          setInterfacePrevValues((prev) => ({
             ...prev,
             [selected.wifi]: {
               rxBytes,
               txBytes,
-              timestamp: now
-            }
+              timestamp: now,
+            },
           }));
         }
-      }, 60000), // Change from 500 to 60000 for once per minute
+      }, 60000),
     [calculateBandwidthRate]
   );
 

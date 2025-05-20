@@ -54,15 +54,32 @@ interface BandwidthUsageCardProps {
   }>;
 }
 
-export function BandwidthUsageCard({
+// Utility function to calculate average rates
+const calculateAverageRates = (history: Array<{ time: string; uploadRate: number; downloadRate: number; interface: string }>) => {
+  if (!history || history.length === 0) {
+    return { avgDownloadRate: 0, avgUploadRate: 0 };
+  }
+
+  const totalDownload = history.reduce((sum, entry) => sum + entry.downloadRate, 0);
+  const totalUpload = history.reduce((sum, entry) => sum + entry.uploadRate, 0);
+  const count = history.length;
+
+  return {
+    avgDownloadRate: totalDownload / count,
+    avgUploadRate: totalUpload / count,
+  };
+};
+
+export const BandwidthUsageCard = memo(({
   className,
   ethernetBandwidthChartData,
   wifiBandwidthChartData,
   eth0BandwidthHistory,
   wifiBandwidthHistory
-}: BandwidthUsageCardProps) {
-  // eslint-disable-next-line no-empty-pattern
-  const [] = React.useState(false);
+}: BandwidthUsageCardProps) => {
+  // Calculate average rates for Ethernet and WiFi
+  const { avgDownloadRate: ethAvgDownload, avgUploadRate: ethAvgUpload } = calculateAverageRates(eth0BandwidthHistory);
+  const { avgDownloadRate: wifiAvgDownload, avgUploadRate: wifiAvgUpload } = calculateAverageRates(wifiBandwidthHistory);
 
   return (
     <Card className={cn("col-span-4 w-full max-w-6xl mx-auto shadow-lg hover:shadow-xl transition-shadow duration-300", className)}>
@@ -84,8 +101,8 @@ export function BandwidthUsageCard({
               <CardDescription>
                 {eth0BandwidthHistory.length > 0 ? (
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Download: {(eth0BandwidthHistory[eth0BandwidthHistory.length - 1]?.downloadRate * 60).toFixed(2)} Mbpm</span>
-                    <span>Upload: {(eth0BandwidthHistory[eth0BandwidthHistory.length - 1]?.uploadRate * 60).toFixed(2)} Mbpm</span>
+                    <span>Download: {(ethAvgDownload * 60).toFixed(2)} Mbpm</span>
+                    <span>Upload: {(ethAvgUpload * 60).toFixed(2)} Mbpm</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">No data available</span>
@@ -160,8 +177,8 @@ export function BandwidthUsageCard({
               <CardDescription>
                 {wifiBandwidthHistory.length > 0 ? (
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Download: {(wifiBandwidthHistory[wifiBandwidthHistory.length - 1]?.downloadRate * 60).toFixed(2)} Mbpm</span>
-                    <span>Upload: {(wifiBandwidthHistory[wifiBandwidthHistory.length - 1]?.uploadRate * 60).toFixed(2)} Mbpm</span>
+                    <span>Download: {(wifiAvgDownload * 60).toFixed(2)} Mbpm</span>
+                    <span>Upload: {(wifiAvgUpload * 60).toFixed(2)} Mbpm</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">No data available</span>
@@ -230,5 +247,5 @@ export function BandwidthUsageCard({
       </CardContent>
     </Card>
   );
-}
+});
 
