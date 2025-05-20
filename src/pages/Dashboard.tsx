@@ -473,14 +473,14 @@ export default function Dashboard() {
       }),
       datasets: [
         {
-          label: "Upload Rate (Mbps)",
+          label: "Upload Rate",
           data: eth0BandwidthHistory.map(entry => entry.uploadRate),
           borderColor: "#FF6384",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           fill: true,
         },
         {
-          label: "Download Rate (Mbps)",
+          label: "Download Rate",
           data: eth0BandwidthHistory.map(entry => entry.downloadRate),
           borderColor: "#36A2EB",
           backgroundColor: "rgba(54, 162, 235, 0.2)",
@@ -504,14 +504,14 @@ export default function Dashboard() {
       }),
       datasets: [
         {
-          label: "Upload Rate (Mbps)",
+          label: "Upload Rate",
           data: wifiBandwidthHistory.map(entry => entry.uploadRate),
           borderColor: "#FF6384",
           backgroundColor: "rgba(255, 99, 132, 0.2)",
           fill: true,
         },
         {
-          label: "Download Rate (Mbps)",
+          label: "Download Rate",
           data: wifiBandwidthHistory.map(entry => entry.downloadRate),
           borderColor: "#36A2EB",
           backgroundColor: "rgba(54, 162, 235, 0.2)",
