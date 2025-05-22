@@ -101,8 +101,8 @@ export const BandwidthUsageCard = memo(({
               <CardDescription>
                 {eth0BandwidthHistory.length > 0 ? (
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Download: {(ethAvgDownload * 60).toFixed(2)} Mbpm</span>
-                    <span>Upload: {(ethAvgUpload * 60).toFixed(2)} Mbpm</span>
+                    <span>Download: {(ethAvgDownload * 20).toFixed(2)} Mbpm</span>
+                    <span>Upload: {(ethAvgUpload * 20).toFixed(2)} Mbpm</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">No data available</span>
@@ -140,7 +140,7 @@ export const BandwidthUsageCard = memo(({
                                   tooltip: {
                                     enabled: true,
                                     callbacks: {
-                                      label: (context) => `${context.dataset.label}: ${(context.parsed.y * 60).toFixed(2)} Mbpm`
+                                      label: (context) => `${context.dataset.label}: ${(context.parsed.y * 20).toFixed(2)} Mbpm`
                                     }
                                   },
                                   datalabels: { display: false },
@@ -177,8 +177,8 @@ export const BandwidthUsageCard = memo(({
               <CardDescription>
                 {wifiBandwidthHistory.length > 0 ? (
                   <div className="flex justify-between text-sm text-gray-600">
-                    <span>Download: {(wifiAvgDownload * 60).toFixed(2)} Mbpm</span>
-                    <span>Upload: {(wifiAvgUpload * 60).toFixed(2)} Mbpm</span>
+                    <span>Download: {(wifiAvgDownload * 20).toFixed(2)} Mbpm</span>
+                    <span>Upload: {(wifiAvgUpload * 20).toFixed(2)} Mbpm</span>
                   </div>
                 ) : (
                   <span className="text-sm text-gray-500">No data available</span>
@@ -216,7 +216,7 @@ export const BandwidthUsageCard = memo(({
                                   tooltip: {
                                     enabled: true,
                                     callbacks: {
-                                      label: (context) => `${context.dataset.label}: ${(context.parsed.y * 60).toFixed(2)} Mbpm`
+                                      label: (context) => `${context.dataset.label}: ${(context.parsed.y * 20).toFixed(2)} Mbpm`
                                     }
                                   },
                                   datalabels: { display: false },

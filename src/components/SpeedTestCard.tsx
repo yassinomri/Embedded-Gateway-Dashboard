@@ -21,6 +21,11 @@ export function SpeedTestCard() {
 
     try {
       const data = await runSpeedTest();
+      // Use host system time for the result
+      const localResult: SpeedTestResult = {
+        ...data,
+        time: new Date().toISOString(),
+      };
       setResult(data);
       setHistory((prev) => [data, ...prev.slice(0, 4)]); // Store up to 5 recent results
     } catch (err) {
