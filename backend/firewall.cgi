@@ -46,29 +46,6 @@ if [ "$REQUEST_METHOD" = "GET" ]; then
     done
     JSON="$JSON]}"
 
-    # In GET request, after collecting rules, collect redirects:
-    REDIRECTS="["
-    FIRST_REDIRECT=1
-    j=0
-    while uci get firewall.@redirect[$j] >/dev/null 2>&1; do
-        [ $FIRST_REDIRECT -eq 0 ] && REDIRECTS="$REDIRECTS,"
-        NAME=$(uci get firewall.@redirect[$j].name 2>/dev/null || echo "Redirect-$j")
-        SRC=$(uci get firewall.@redirect[$j].src 2>/dev/null || echo "wan")
-        SRC_DPORT=$(uci get firewall.@redirect[$j].src_dport 2>/dev/null || echo "")
-        DEST=$(uci get firewall.@redirect[$j].dest 2>/dev/null || echo "lan")
-        DEST_IP=$(uci get firewall.@redirect[$j].dest_ip 2>/dev/null || echo "")
-        DEST_PORT=$(uci get firewall.@redirect[$j].dest_port 2>/dev/null || echo "")
-        PROTO=$(uci get firewall.@redirect[$j].proto 2>/dev/null || echo "tcp")
-        ENABLED=$(uci get firewall.@redirect[$j].enabled 2>/dev/null || echo 1)
-        REDIRECTS="$REDIRECTS{\"id\": \"redirect-$j\", \"name\": \"$NAME\", \"src\": \"$SRC\", \"src_dport\": \"$SRC_DPORT\", \"dest\": \"$DEST\", \"dest_ip\": \"$DEST_IP\", \"dest_port\": \"$DEST_PORT\", \"proto\": \"$PROTO\", \"enabled\": $ENABLED}"
-        FIRST_REDIRECT=0
-        j=$((j + 1))
-    done
-    REDIRECTS="$REDIRECTS]"
-
-    # Add redirects to the JSON output:
-    JSON="{\"enabled\": $ENABLED, \"rules\": [$RULES], \"redirects\": $REDIRECTS}"
-
     echo "$(date): Parsed - $JSON" >> /tmp/firewall_cgi.log
     echo "$JSON"
     echo "$(date): GET response sent: $JSON" >> /tmp/firewall_cgi.log
@@ -173,37 +150,6 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
         done
         uci commit firewall 2>/dev/null
         /etc/init.d/firewall reload 2>/dev/null
-    fi
-
-    # In POST request, add handling for "redirects" array (similar to "rules")
-    # Example for adding/updating redirects:
-    REDIRECTS=$(echo "$POST_DATA" | sed -n 's/.*"redirects"[ ]*:[ ]*\[\([^]]*\)\].*/\1/p')
-    if [ -n "$REDIRECTS" ]; then
-        echo "$REDIRECTS" | grep -o "{[^}]*}" | while IFS= read -r redirect; do
-            if [ "$ACTION" = "add_redirect" ]; then
-                NAME=$(echo "$redirect" | sed -n 's/.*"name"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                SRC=$(echo "$redirect" | sed -n 's/.*"src"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                SRC_DPORT=$(echo "$redirect" | sed -n 's/.*"src_dport"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                DEST=$(echo "$redirect" | sed -n 's/.*"dest"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                DEST_IP=$(echo "$redirect" | sed -n 's/.*"dest_ip"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                DEST_PORT=$(echo "$redirect" | sed -n 's/.*"dest_port"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                PROTO=$(echo "$redirect" | sed -n 's/.*"proto"[ ]*:[ ]*"\([^"]*\)".*/\1/p')
-                ENABLED=$(echo "$redirect" | sed -n 's/.*"enabled"[ ]*:[ ]*\([^,}\ ]*\).*/\1/p')
-                NEW_REDIRECT=$(uci add firewall redirect 2>/dev/null)
-                uci set "firewall.$NEW_REDIRECT.name=$NAME"
-                uci set "firewall.$NEW_REDIRECT.src=$SRC"
-                uci set "firewall.$NEW_REDIRECT.src_dport=$SRC_DPORT"
-                uci set "firewall.$NEW_REDIRECT.dest=$DEST"
-                uci set "firewall.$NEW_REDIRECT.dest_ip=$DEST_IP"
-                uci set "firewall.$NEW_REDIRECT.dest_port=$DEST_PORT"
-                uci set "firewall.$NEW_REDIRECT.proto=$PROTO"
-                [ "$ENABLED" = "true" ] && uci set "firewall.$NEW_REDIRECT.enabled=1"
-                [ "$ENABLED" = "false" ] && uci set "firewall.$NEW_REDIRECT.enabled=0"
-            fi
-            # Add update/delete logic as needed
-        done
-        uci commit firewall
-        /etc/init.d/firewall reload
     fi
 
     RESPONSE="{\"status\": \"success\", \"message\": \"$([ "$ACTION" = "add" ] && echo "Rule added" || [ "$ACTION" = "update" ] && echo "Rule updated" || echo "Firewall updated")\"}"
