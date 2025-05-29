@@ -116,12 +116,11 @@ export default function Dashboard() {
         throw err;
       }
     },
-    staleTime: 60000, // Consider data fresh for 1 minute
+    staleTime: 5000, // Consider data fresh for 5 secs
     gcTime: 5 * 60 * 1000, // Cache for 5 minutes
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
-    retry: 1, // Only retry once on failure
-    refetchInterval: 60000, // Refetch every minute
-    // Only fetch if system is online
+    refetchOnWindowFocus: false,
+    retry: 1,
+    refetchInterval: 5000, // Refetch every 5 seconds
     enabled: systemOnline,
   });
 
@@ -133,7 +132,7 @@ export default function Dashboard() {
   } = useQuery({
     queryKey: ['securityAlerts'],
     queryFn: () => securityAlertsApi.getAlerts(10, false),
-    staleTime: 60000, // Consider data fresh for 60 seconds
+    staleTime: 10000, // Consider data fresh for 10 seconds
     enabled: systemOnline, // Only fetch if system is online
   });
 
@@ -268,7 +267,7 @@ export default function Dashboard() {
             },
           }));
         }
-      }, 60000),
+      }, 5000), // <--- 5,000 ms = 5 seconds
     [calculateBandwidthRate]
   );
 
