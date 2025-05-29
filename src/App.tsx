@@ -23,6 +23,7 @@ import Performance from "@/pages/Performance";
 import PacketAnalyzer from "./pages/PacketAnalyzer";
 import System from "./pages/System";
 import SecurityLogs from "./pages/SecurityLogs";
+import Settings from "@/pages/Settings";
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="container mx-auto p-6">
@@ -57,6 +58,8 @@ const App = () => (
               <Route path="/packet" element={<PacketAnalyzer/>} />
 
               <Route path="/system" element={<System/>} />
+
+              <Route path="/settings" element={<Settings/>} />
               
               {/* Add Security Logs Route */}
               <Route path="/security-logs" element={<SecurityLogs />} />

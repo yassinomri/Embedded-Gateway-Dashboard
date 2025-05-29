@@ -1,6 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
+import { login as apiLogin } from "@/lib/login-api";
 
 interface User {
   id: string;
@@ -44,16 +44,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string) => {
     setIsLoading(true);
-    
+
     try {
-      // Mock API call - would be replaced with actual backend call
-      if (username === "admin" && password === "password") {
+      // Call your backend API
+      const result = await apiLogin(username, password);
+
+      if (result.success) {
         const user = {
           id: "1",
-          username: "admin",
+          username,
           role: "admin" as const
         };
-        
         setUser(user);
         localStorage.setItem("openwrt-user", JSON.stringify(user));
         toast({
@@ -61,7 +62,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           description: "Welcome to the OpenWRT Gateway Admin"
         });
       } else {
-        throw new Error("Invalid credentials");
+        throw new Error(result.error || "Invalid credentials");
       }
     } catch (error) {
       toast({
@@ -109,3 +110,15 @@ export function useAuth() {
   
   return context;
 }
+
+// Additional code to handle login result
+const handleLoginResult = async (result: { success: boolean; error?: string }, data: { username: string; password: string }) => {
+  if (result.success) {
+    sessionStorage.setItem('currentCredentials', JSON.stringify({
+      username: data.username,
+      password: data.password,
+    }));
+    window.location.href = "/";
+  }
+};
+

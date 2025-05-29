@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Server, Home, Network, Shield, BarChart, Package, Settings, Power } from "lucide-react";
+import { Server, Home, Network, Shield, BarChart, Package, Settings, Power, SettingsIcon } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -36,6 +36,7 @@ const navItems: NavItemProps[] = [
   { title: "Performance", icon: BarChart, path: "/performance" },
   { title: "Packet Analysis", icon: Package, path: "/packet" },
   { title: "System", icon: Server, path: "/system" },
+  {title: "Settings", icon: SettingsIcon, path: "/settings"},
 ];
 
 export function NavItem({ title, icon: Icon, path }: NavItemProps) {

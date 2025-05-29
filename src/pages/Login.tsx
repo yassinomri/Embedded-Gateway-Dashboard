@@ -1,6 +1,5 @@
-
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom"; // Remove if not available
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useNavigate } from "react-router-dom";
 
 const loginSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
@@ -24,7 +24,7 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function Login() {
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // Remove if react-router-dom not available
   const { login, isLoading } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
@@ -39,10 +39,43 @@ export default function Login() {
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setError(null);
-      await login(data.username, data.password);
-      navigate("/");
+
+      const response = await fetch('http://192.168.1.2/cgi-bin/credentials.cgi?action=login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: data.username,
+          password: data.password,
+        }),
+      });
+
+      const text = await response.text();
+      console.log("Raw response:", text);
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (e) {
+        setError("Invalid response from server");
+        return;
+      }
+      console.log("Parsed result:", result);
+
+      if (result.success) {
+        console.log("Login success, about to call useAuth().login");
+        sessionStorage.setItem('currentCredentials', JSON.stringify({
+          username: data.username,
+          password: data.password,
+        }));
+        await login(data.username, data.password);
+        console.log("Called login, redirecting...");
+        window.location.href = "/";
+      } else {
+        setError(result.error || "Invalid username or password");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
+      setError("Login failed - please try again");
     }
   };
 
@@ -93,10 +126,6 @@ export default function Login() {
             </Button>
           </form>
         </Form>
-
-        <div className="text-center text-sm text-muted-foreground">
-          <p>Default credentials: admin / password</p>
-        </div>
       </div>
     </div>
   );
