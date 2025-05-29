@@ -194,14 +194,28 @@ const Performance = () => {
           </button>
           <button
             onClick={handleToggleQoS}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md transition text-sm font-medium ${
-              data.qos.enabled
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition text-sm font-medium border
+              ${data.qos.enabled
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-gray-200 text-gray-700 border-gray-300'}
+            `}
+            aria-pressed={data.qos.enabled}
           >
-            <Settings size={18} />
-            QoS {data.qos.enabled ? 'On' : 'Off'}
+            <span
+              className={`inline-block w-10 h-6 rounded-full transition-colors duration-200 relative
+                ${data.qos.enabled ? 'bg-blue-400' : 'bg-gray-400'}
+              `}
+            >
+              <span
+                className={`absolute top-0 left-0 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200
+                  ${data.qos.enabled ? 'translate-x-4' : ''}
+                `}
+                style={{ transform: data.qos.enabled ? 'translateX(1rem)' : 'translateX(0)' }}
+              />
+            </span>
+            <span className={data.qos.enabled ? 'text-white' : 'text-gray-700'}>
+              QoS {data.qos.enabled ? 'On' : 'Off'}
+            </span>
           </button>
         </div>
       </div>

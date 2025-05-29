@@ -132,11 +132,11 @@ if [ "$REQUEST_METHOD" = "POST" ]; then
     echo "{\"status\": \"success\", \"message\": \"Network test completed\"}"
   elif [ "$action" = "update" ]; then
     qos_enabled=$(echo "$POST_DATA" | jsonfilter -e '@.qosEnabled')
-    uci set qos.enabled="$([ "$qos_enabled" = "true" ] && echo 1 || echo 0)"
-    uci commit qos
-    /etc/init.d/qos restart >/dev/null 2>&1
-    log "QoS updated: enabled=$qos_enabled"
-    echo "{\"status\": \"success\", \"message\": \"QoS updated\"}"
+    uci set sqm.@queue[0].enabled="$([ "$qos_enabled" = "true" ] && echo 1 || echo 0)"
+    uci commit sqm
+    /etc/init.d/sqm restart >/dev/null 2>&1
+    log "SQM updated: enabled=$qos_enabled"
+    echo "{\"status\": \"success\", \"message\": \"SQM updated\"}"
   else
     log "Invalid action: $action"
     echo "{\"status\": \"error\", \"message\": \"Invalid action\"}"
@@ -151,7 +151,7 @@ ping_metrics=$(get_ping_metrics $target_ip 4)
 latency=$(echo $ping_metrics | jsonfilter -e '@.latency')
 packet_loss=$(echo $ping_metrics | jsonfilter -e '@.packetLoss')
 throughput=$(get_throughput)
-qos_enabled=$(uci get qos.enabled 2>/dev/null || echo 0)
+qos_enabled=$(uci get sqm.@queue[0].enabled 2>/dev/null || echo 0)
 history=$(update_history $latency $packet_loss $throughput)
 
 # Output JSON

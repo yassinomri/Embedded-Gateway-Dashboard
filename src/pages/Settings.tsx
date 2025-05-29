@@ -149,7 +149,16 @@ export default function Settings() {
       {/* Confirmation Popup */}
       {showConfirmPopup && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-sm mx-4 shadow-xl">
+          <div className="bg-white rounded-lg p-6 w-full max-w-sm mx-4 shadow-xl relative">
+            {/* Exit X button */}
+            <button
+              type="button"
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl"
+              aria-label="Close"
+              onClick={handleCancelConfirm}
+            >
+              &times;
+            </button>
             <h3 className="text-lg font-semibold mb-4 text-center">Confirm Password Change</h3>
             <p className="text-sm text-gray-600 mb-4">
               Please enter your current password to confirm the changes.
