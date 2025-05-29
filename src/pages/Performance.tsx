@@ -158,12 +158,18 @@ const Performance = () => {
 
   const handleToggleQoS = async () => {
     const newEnabled = !data.qos.enabled;
+    // Optimistically update UI
+    mutate(
+      { ...data, qos: { ...data.qos, enabled: newEnabled } },
+      false // don't revalidate immediately
+    );
     try {
       await updatePerformance({ action: 'update', qosEnabled: newEnabled });
       toast({
         title: 'Success',
         description: `QoS ${newEnabled ? 'enabled' : 'disabled'} successfully`,
       });
+      // Now revalidate to sync with backend
       mutate();
     } catch {
       toast({
@@ -171,6 +177,8 @@ const Performance = () => {
         title: 'Error',
         description: 'Failed to toggle QoS',
       });
+      // Optionally, revert optimistic update if error
+      mutate();
     }
   };
 
