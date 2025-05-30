@@ -36,16 +36,19 @@ export function SpeedTestCard() {
     }
   };
 
+  // Update the color functions to new ranges
   const getSpeedColor = (speed: number) => {
-    if (speed >= 50) return 'bg-green-500';
-    if (speed >= 20) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (speed > 100) return 'bg-blue-500';      // Excellent
+    if (speed >= 30) return 'bg-green-500';     // Good
+    if (speed >= 10) return 'bg-yellow-500';    // Moderate
+    return 'bg-red-500';                        // Bad
   };
 
   const getLatencyColor = (latency: number) => {
-    if (latency < 50) return 'bg-green-500';
-    if (latency < 100) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (latency < 20) return 'bg-blue-500';    // Excellent
+    if (latency < 50) return 'bg-green-500';   // Good
+    if (latency < 100) return 'bg-yellow-500'; // Moderate
+    return 'bg-red-500';                       // Bad
   };
 
   return (
@@ -88,14 +91,17 @@ export function SpeedTestCard() {
               <TooltipTrigger asChild>
                 <div className="space-y-2 text-center">
                   <div className="text-sm font-medium text-gray-600">Download</div>
-                  <Progress
-                    value={result ? Math.min(result.download, 100) : 0}
-                    className={cn(
-                      'h-3 transition-all duration-1000 ease-out',
-                      result ? getSpeedColor(result.download) : 'bg-gray-200'
-                    )}
-                    aria-label={`Download speed: ${result ? result.download.toFixed(1) : 0} Mbps`}
-                  />
+                  <div className="flex items-center justify-center">
+                    <span
+                      className={cn(
+                        "inline-block w-6 h-6 rounded-full border-2 border-gray-300",
+                        result && typeof result.download === "number"
+                          ? getSpeedColor(result.download)
+                          : "bg-gray-200"
+                      )}
+                      aria-label={`Download speed: ${result && typeof result.download === "number" ? result.download.toFixed(1) : 0} Mbps`}
+                    />
+                  </div>
                   <div className="text-sm font-semibold">
                     {result && typeof result.download === 'number'
                       ? `${result.download.toFixed(1)} Mbps`
@@ -113,14 +119,17 @@ export function SpeedTestCard() {
               <TooltipTrigger asChild>
                 <div className="space-y-2 text-center">
                   <div className="text-sm font-medium text-gray-600">Upload</div>
-                  <Progress
-                    value={result ? Math.min(result.upload, 100) : 0}
-                    className={cn(
-                      'h-3 transition-all duration-1000 ease-out',
-                      result ? getSpeedColor(result.upload) : 'bg-gray-200'
-                    )}
-                    aria-label={`Upload speed: ${result ? result.upload.toFixed(1) : 0} Mbps`}
-                  />
+                  <div className="flex items-center justify-center">
+                    <span
+                      className={cn(
+                        "inline-block w-6 h-6 rounded-full border-2 border-gray-300",
+                        result && typeof result.upload === "number"
+                          ? getSpeedColor(result.upload)
+                          : "bg-gray-200"
+                      )}
+                      aria-label={`Upload speed: ${result && typeof result.upload === "number" ? result.upload.toFixed(1) : 0} Mbps`}
+                    />
+                  </div>
                   <div className="text-sm font-semibold">
                     {result && typeof result.upload === 'number'
                       ? `${result.upload.toFixed(1)} Mbps`
@@ -138,14 +147,17 @@ export function SpeedTestCard() {
               <TooltipTrigger asChild>
                 <div className="space-y-2 text-center">
                   <div className="text-sm font-medium text-gray-600">Latency</div>
-                  <Progress
-                    value={result ? Math.min(100 - result.latency, 100) : 0}
-                    className={cn(
-                      'h-3 transition-all duration-1000 ease-out',
-                      result ? getLatencyColor(result.latency) : 'bg-gray-200'
-                    )}
-                    aria-label={`Latency: ${result ? result.latency.toFixed(1) : 0} ms`}
-                  />
+                  <div className="flex items-center justify-center">
+                    <span
+                      className={cn(
+                        "inline-block w-6 h-6 rounded-full border-2 border-gray-300",
+                        result && typeof result.latency === "number"
+                          ? getLatencyColor(result.latency)
+                          : "bg-gray-200"
+                      )}
+                      aria-label={`Latency: ${result && typeof result.latency === "number" ? result.latency.toFixed(1) : 0} ms`}
+                    />
+                  </div>
                   <div className="text-sm font-semibold">
                     {result && typeof result.latency === 'number'
                       ? `${result.latency.toFixed(1)} ms`

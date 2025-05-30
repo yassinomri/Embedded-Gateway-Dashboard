@@ -2,7 +2,7 @@
 echo "Content-Type: application/json"
 echo "Access-Control-Allow-Origin: *"
 echo "Access-Control-Allow-Methods: GET, POST, OPTIONS"
-echo "Access-Control-Allow-Headers: Content-Type"
+echo "Access-Control-Allow-Headers: Content-Type, Pragma, Cache-Control, Authorization"
 echo
 
 # Retrieve memory usage
