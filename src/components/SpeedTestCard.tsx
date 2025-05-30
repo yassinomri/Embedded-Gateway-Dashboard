@@ -97,7 +97,9 @@ export function SpeedTestCard() {
                     aria-label={`Download speed: ${result ? result.download.toFixed(1) : 0} Mbps`}
                   />
                   <div className="text-sm font-semibold">
-                    {result ? `${result.download.toFixed(1)} Mbps` : '0.0 Mbps'}
+                    {result && typeof result.download === 'number'
+                      ? `${result.download.toFixed(1)} Mbps`
+                      : '0.0 Mbps'}
                   </div>
                 </div>
               </TooltipTrigger>
@@ -120,7 +122,9 @@ export function SpeedTestCard() {
                     aria-label={`Upload speed: ${result ? result.upload.toFixed(1) : 0} Mbps`}
                   />
                   <div className="text-sm font-semibold">
-                    {result ? `${result.upload.toFixed(1)} Mbps` : '0.0 Mbps'}
+                    {result && typeof result.upload === 'number'
+                      ? `${result.upload.toFixed(1)} Mbps`
+                      : '0.0 Mbps'}
                   </div>
                 </div>
               </TooltipTrigger>
@@ -143,7 +147,9 @@ export function SpeedTestCard() {
                     aria-label={`Latency: ${result ? result.latency.toFixed(1) : 0} ms`}
                   />
                   <div className="text-sm font-semibold">
-                    {result ? `${result.latency.toFixed(1)} ms` : '0.0 ms'}
+                    {result && typeof result.latency === 'number'
+                      ? `${result.latency.toFixed(1)} ms`
+                      : '0.0 ms'}
                   </div>
                 </div>
               </TooltipTrigger>
@@ -197,7 +203,9 @@ export function SpeedTestCard() {
                     {new Date(item.time).toLocaleString()}
                   </p>
                   <p className="text-sm">
-                    Download: {item.download.toFixed(1)} Mbps | Upload: {item.upload.toFixed(1)} Mbps | Latency: {item.latency.toFixed(1)} ms
+                    Download: {typeof item.download === 'number' ? item.download.toFixed(1) : '0.0'} Mbps | 
+                    Upload: {typeof item.upload === 'number' ? item.upload.toFixed(1) : '0.0'} Mbps | 
+                    Latency: {typeof item.latency === 'number' ? item.latency.toFixed(1) : '0.0'} ms
                   </p>
                 </div>
               ))
