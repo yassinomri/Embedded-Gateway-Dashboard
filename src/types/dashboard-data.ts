@@ -28,7 +28,17 @@ export interface DashboardData {
       connectionType: string;
     }[];
   };
+  perDeviceBandwidth?: PerDeviceBandwidth[]; // <-- Add this line
   timestamp?: number; // Add timestamp field
+}
+
+export interface PerDeviceBandwidth {
+  mac: string;
+  ip?: string;
+  hostname?: string;
+  downloadRate?: number; // Mbps
+  uploadRate?: number;   // Mbps
+  totalBytes?: number;   // Optional: total bytes transferred
 }
 
 export interface NetworkInterface {
