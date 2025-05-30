@@ -36,7 +36,7 @@ export function SpeedTestCard() {
     }
   };
 
-  // Update the color functions to new ranges
+  // Download speed color (unchanged)
   const getSpeedColor = (speed: number) => {
     if (speed > 100) return 'bg-blue-500';      // Excellent
     if (speed >= 30) return 'bg-green-500';     // Good
@@ -44,10 +44,18 @@ export function SpeedTestCard() {
     return 'bg-red-500';                        // Bad
   };
 
+  // Upload speed color (customized as requested)
+  const getUploadColor = (speed: number) => {
+    if (speed > 50) return 'bg-blue-500';       // Excellent
+    if (speed >= 20) return 'bg-green-500';     // Good
+    if (speed >= 5) return 'bg-yellow-500';     // Moderate
+    return 'bg-red-500';                        // Poor
+  };
+
   const getLatencyColor = (latency: number) => {
     if (latency < 20) return 'bg-blue-500';    // Excellent
     if (latency < 50) return 'bg-green-500';   // Good
-    if (latency < 100) return 'bg-yellow-500'; // Moderate
+    if (latency < 100) return 'bg-yellow-500'; // Moderateok 
     return 'bg-red-500';                       // Bad
   };
 
@@ -124,7 +132,7 @@ export function SpeedTestCard() {
                       className={cn(
                         "inline-block w-6 h-6 rounded-full border-2 border-gray-300",
                         result && typeof result.upload === "number"
-                          ? getSpeedColor(result.upload)
+                          ? getUploadColor(result.upload)
                           : "bg-gray-200"
                       )}
                       aria-label={`Upload speed: ${result && typeof result.upload === "number" ? result.upload.toFixed(1) : 0} Mbps`}
