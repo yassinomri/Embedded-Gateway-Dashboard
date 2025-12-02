@@ -1,79 +1,140 @@
 # Embedded Gateway Dashboard
 
-A lightweight monitoring and control dashboard for embedded gateways and edge devices. This repository contains a modern TypeScript frontend (Vite + Tailwind) and a compact backend designed to run inside prplOS / OpenWrt-based gateway images (on real devices or in QEMU). The goal is to provide operators and integrators a simple, local UI to observe gateway health, inspect device telemetry, and interact with edge services without burdening constrained hardware.
+A frontend-first dashboard for monitoring and interacting with gateways and edge devices. This repository is primarily a modern TypeScript single-page application (Vite + Tailwind) that implements UI screens, components, and example data for a gateway/device dashboard. It includes screenshots and static assets to demonstrate the design and expected flows.
 
-## High-level intent and architecture
+This repo focuses on the user interface and developer-facing pieces — it provides a working SPA and UI prototypes. The backend in this repository is a collection of CGI scripts and helpers intended to be deployed under /www on OpenWrt-based gateway systems (see the /backend directory content below).
 
-- Frontend: A thin, performant SPA (TypeScript + Vite) with Tailwind-styled components. The UI surfaces dashboards, device lists, logs, telemetry charts, and control actions.
-- Backend: A small agent service intended to run on the gateway (prplOS / OpenWrt). It collects telemetry, normalizes events, exposes REST endpoints for the UI, and bridges local protocols (HTTPS).
-- Target runtime: Embedded Linux (prplOS / OpenWrt). The backend is developed with embedded constraints and packaging expectations in mind so it can be shipped inside a firmware image.
+## What the repository contains now
 
-## Core functionalities
+- Frontend: TypeScript-based SPA built with Vite and styled with Tailwind CSS (source under `src/`, SPA bootstrap at `index.html`).
+- Static assets and screenshots (root) to show the UI and flows.
+- A `backend/` directory containing CGI scripts and small shell helpers intended to run from the device web root (`/www`) on OpenWrt-based gateways — these are not a full packaged service but are deployable web endpoints for embedded firmware.
+- Tooling and config files for building and linting (Vite, Tailwind, TypeScript, ESLint, etc.).
+- Lockfiles for package managers (bun.lockb and package-lock.json).
 
-- Device & gateway overview
-  - Consolidated views of connected gateways and edge devices with status badges (online/offline, signal, uptime).
-  - Per-device metadata: firmware version, last seen, identifiers, and basic diagnostics.
+## Backend (what's actually in /backend)
 
-- Telemetry ingestion & visualization
-  - Capture short-term time-series telemetry (temperature, CPU, memory, throughput, etc.).
-  - Trend charts and lightweight visualizations to track metrics over time.
+The backend directory contains CGI scripts and small shell helpers that are expected to live inside the gateway's web root (/www) on an OpenWrt-based system. These scripts implement device management pages, network utilities, and monitoring endpoints used by the frontend UI:
 
-- Logs & event stream
-  - Centralized collection of device and gateway logs with filtering and timestamps.
-  - Live-stream view for realtime debugging and monitoring.
+- connected-device.cgi — Manage device popup and details for connected devices
+- credentials.cgi — Settings page for updating credentials (username/password)
+- dashboard_data.cgi — Internet speed test enhancements and dashboard data
+- dhcp_dns.cgi — DHCP & DNS configuration and IP range validation
+- firewall.cgi — Firewall-related endpoints (legacy/compat behavior)
+- network.cgi — Network page and gateway-status detection fixes
+- network_monitor.sh — Wifi auth alerting backend helper
+- packet-analyzer.cgi — Network analysis endpoints used by the UI
+- performance.cgi — QoS management and SQM integration
+- ping.cgi — Ping/check endpoints and network page helpers
+- reboot.cgi — System page endpoint for reboot and system actions
+- security_alerts.cgi — Wifi authentication alerts reporting
+- speed_test.cgi — Internet speed test endpoint
+- system_info.cgi — System information retrieval endpoint
+- wifi_monitor.sh — Wifi log mechanism to capture failed auths
+- wireless.cgi — Wireless configuration and status endpoints
 
-- Real-time updates
-  - Near-real-time state and telemetry delivery via WebSocket (or long-polling).
-  - Optional MQTT bridging to subscribe to device topics and reflect messages in the UI.
+These scripts are designed as lightweight web endpoints (CGI + small shell scripts) so they can be deployed directly into the gateway firmware image (for example into /www) and called from the frontend UI. They are not a full standalone backend service with database persistence; instead they bridge the SPA to on-device utilities and configuration.
 
-- Control & management
-  - Pluggable control endpoints for common actions (restart device/service, trigger OTA, update configuration).
-  - Exposed REST endpoints to enable automation and integration with orchestration tools.
+## Current, implemented functionality (frontend-focused)
+- Dashboard UI and layout for device/gateway overviews.
+- Device list and detail panels (UI and mock/example data).
+- Telemetry charts and lightweight visual mockups for time-series metrics.
+- Logs/event stream UI with filtering and live/demo data.
+- Control action UI elements (buttons/forms) demonstrating control flows wired to frontend handlers and the CGI endpoints in `/backend`.
 
-- Local-first hosting mindset
-  - Intended to run locally on the gateway so dashboard functionality remains available when cloud connectivity is lost.
-  - Small footprint and dependency awareness to fit constrained embedded images.
+Note: While the frontend is a complete SPA, backend behavior (persistence, authentication, packaging, or fully featured protocol adapters) is limited to the supplied CGI endpoints and helper scripts and may require adaptation for production firmware.
 
-## Data flow (conceptual)
+## Quick start (developer)
+1. Install dependencies
+   - npm: `npm install`
+   - or if you prefer bun: `bun install`
+2. Run dev server
+   - npm: `npm run dev` (or the equivalent defined in package.json)
+3. Build for production
+   - npm: `npm run build`
+4. Preview the built SPA
+   - npm: `npm run preview`
 
-1. Devices publish telemetry/events locally.
-2. Backend reads those streams, normalizes messages, and stores short-term telemetry.
-3. Frontend subscribes to backend APIs to render live updates and historical queries.
+(Exact script names are defined in package.json — please refer to it if a different package manager or script is preferred.)
 
-## Extensibility & integration points
+## Deployment (to an OpenWrt-based gateway)
+This section explains how to deploy both the backend CGI scripts and the built frontend SPA so the dashboard can be served directly from the gateway.
 
-- Backend adapters: Add protocol adapters (LoRa, Zigbee, Serial, proprietary protocols) as modular backend hooks.
-- UI modules: Swap visualizations, add device detail panels, or plug in third-party charting components.
-- Packaging: Backend is intended to be packageable for OpenWrt/prplOS (ipk or included in image) and run as a local system service.
+1) Build the frontend locally
+- From the project root:
+  - Install: `npm install` (or `bun install`)
+  - Build: `npm run build`
+- The Vite build output is typically `dist/`. Verify the build directory after running the build.
 
-## Security considerations
+2) Choose a web-root path on the gateway
+- Option A (root): copy UI to `/www/` so the dashboard is served at `https://<gateway>/`
+- Option B (subpath): copy UI to `/www/embedded-dashboard/` and set the Vite base to `/embedded-dashboard/` before building
+  - To set base, edit `vite.config.ts` or set `--base /embedded-dashboard/` when running the build
 
-- Minimize exposed network surface on the gateway.
-- Use TLS and authentication for remote access.
-- Keep service privileges and dependencies minimal to reduce attack surface.
+3) Copy files to the gateway
+- Example using scp/rsync:
+  - Copy built UI:
+    - `scp -r dist/* root@<GW>:/www/embedded-dashboard/`
+  - Copy backend scripts:
+    - `scp backend/*.cgi root@<GW>:/www/`
+    - `scp backend/*.sh root@<GW>:/www/`
 
-## Who benefits / Typical use cases
+4) Set permissions on the gateway
+- SSH to gateway and run:
+  - `chmod +x /www/*.cgi /www/*.sh`
+  - `chown root:root /www/*.cgi /www/*.sh` (or suitable owner)
+- Verify script shebangs (e.g. `#!/bin/sh`, `#!/bin/bash`, or `#!/usr/bin/env node`) and that required interpreters exist on the device.
 
-- Edge integrators who need an onsite UI to monitor gateways and devices.
-- Device developers debugging connectivity and telemetry during field trials.
-- Operations teams who want a local fallback dashboard when cloud services are unreachable.
-- Labs using QEMU/emulation to reproduce gateway behavior for testing.
+5) Configure uHTTPd (or your web server)
+- Ensure CGI execution is enabled and the document root includes your files.
+- Example minimal uhttpd snippet (add to `/etc/config/uhttpd` or equivalent):
 
-## What this repository contains (conceptual)
+config uhttpd 'main'
+    option home '/www'
+    option rfc1918_filter '1'
 
-- Frontend source (TypeScript, Vite + Tailwind) implementing the dashboard UI.
-- Static assets and SPA bootstrap (index.html) for the frontend.
-- backend/ — compact server-side agent code intended for embedded packaging.
-- Tooling and config files (Vite, Tailwind, TypeScript configs) indicating a modern stack and packaging intent.
+config cgi
+    option match '^/.*\.cgi$'
+    option interpreter '/usr/bin/env bash'
 
-## Design benefits for embedded deployments
+- If you serve the SPA from a subpath (eg `/embedded-dashboard/`), ensure the document root contains that folder and asset paths match the SPA base.
 
-- Local-first reduces reliance on external connectivity and keeps basic management available on-site.
-- Packaging backend into the image enables startup as a system service and inclusion in firmware workflows.
-- Modular design lets you add protocol adapters, change storage/forwarding behavior, or replace UI components without reworking the whole system.
+6) SPA routing / fallback
+- For history-mode client-side routing, configure the web server to serve `index.html` for unknown routes, or use hash-based routing to avoid server rewrites.
 
----
+7) Paths & CORS
+- If SPA and CGI live on the same host/port, CORS is not needed. If hosted separately, enable CORS or proxy requests.
+- Confirm the frontend points to the correct CGI paths (relative vs absolute). Update the frontend config if you moved scripts to a different path.
 
-If you want a concise functional spec mapping UI screens to backend endpoints (API contract + event channels) or a packaging blueprint (what files and init scripts to include in an OpenWrt package), reach me and say which one and which target architecture (e.g., x86_64, arm, arm64, ramips), and I’ll draft it next.
+8) Runtime dependencies & privileges
+- Confirm utilities used by scripts (ip, tc, sqm, ping, etc.) are present on the gateway and that scripts have the privileges needed to run them.
+- Actions like reboot or firewall modification require root privileges.
 
+9) Post-deploy checks
+- Visit the dashboard in a browser and open DevTools → Network to confirm assets load.
+- Call a CGI endpoint directly (e.g. `https://<GW>/speed_test.cgi`) to verify output.
+- Check logs (`/var/log/messages`, uhttpd logs) for script errors.
+
+10) Packaging into firmware (optional)
+- For reproducible deployments, include the frontend and backend files in an OpenWrt image or create an IPK package to install them.
+
+## Deploy example commands (summary)
+- Build & copy (example):
+  - `npm install && npm run build`
+  - `scp -r dist/* root@<GW>:/www/embedded-dashboard/`
+  - `scp backend/*.cgi root@<GW>:/www/`
+  - `ssh root@<GW> 'chmod +x /www/*.cgi /www/*.sh'`
+
+## Extending this project
+- Frontend: add components, connect real APIs, replace mock data with live endpoints.
+- Backend: extend the CGI scripts, or replace them with a packaged system service if you want more persistence or robustness.
+- Packaging: create an IPK package or image integration if you want the dashboard included in firmware builds.
+
+## Contributing
+Contributions are welcome. If you plan to extend the backend into a production agent, add protocol adapters, or create an OpenWrt package, please open an issue describing the intended scope so we can coordinate.
+
+## Author
 By: Yassin Omri
+
+## License
+No license file is included in this repository. Add a LICENSE file if you intend to relicense or publish under a specific open-source license.
