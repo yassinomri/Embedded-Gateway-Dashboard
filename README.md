@@ -125,11 +125,6 @@ config cgi
   - `scp backend/*.cgi root@<GW>:/www/`
   - `ssh root@<GW> 'chmod +x /www/*.cgi /www/*.sh'`
 
-## Extending this project
-- Frontend: add components, connect real APIs, replace mock data with live endpoints.
-- Backend: extend the CGI scripts, or replace them with a packaged system service if you want more persistence or robustness.
-- Packaging: create an IPK package or image integration if you want the dashboard included in firmware builds.
-
 ## Contributing
 Contributions are welcome. If you plan to extend the backend into a production agent, add protocol adapters, or create an OpenWrt package, please open an issue describing the intended scope so we can coordinate.
 
@@ -137,4 +132,4 @@ Contributions are welcome. If you plan to extend the backend into a production a
 By: Yassin Omri
 
 ## License
-No license file is included in this repository. Add a LICENSE file if you intend to relicense or publish under a specific open-source license.
+No license file is included in this repository.
