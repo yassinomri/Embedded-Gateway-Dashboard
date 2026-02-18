@@ -1,0 +1,63 @@
+name: Build and Deploy to QEMU
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make
+      
+      - name: Build hello_world
+        run: make all
+      
+      - name: Test locally
+        run: make test
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: hello_world-binary
+          path: hello_world
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: hello_world-binary
+      
+      - name: Make binary executable
+        run: chmod +x hello_world
+      
+      - name: Deploy to QEMU
+        env:
+          QEMU_HOST: localhost
+          QEMU_PORT: 2222
+          QEMU_USER: root
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.QEMU_SSH_KEY }}" > ~/.ssh/qemu_key
+          chmod 600 ~/.ssh/qemu_key
+          
+          scp -o StrictHostKeyChecking=no \
+              -i ~/.ssh/qemu_key \
+              -P $QEMU_PORT \
+              hello_world $QEMU_USER@$QEMU_HOST:/tmp/
+          
+          ssh -o StrictHostKeyChecking=no \
+              -i ~/.ssh/qemu_key \
+              -p $QEMU_PORT \
+              $QEMU_USER@$QEMU_HOST \
+              "/tmp/hello_world"
