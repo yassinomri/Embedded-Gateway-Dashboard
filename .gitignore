@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Binaries
+hello_world
+*.o
+*.a
+build/
+dist/
+
+# System
+.DS_Store
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
