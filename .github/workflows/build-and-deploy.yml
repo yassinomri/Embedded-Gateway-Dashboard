@@ -1,4 +1,4 @@
-name: Build and Deploy to QEMU
+name: Build and Test
 
 on: [push, pull_request]
 
@@ -26,38 +26,8 @@ jobs:
         with:
           name: hello_world-binary
           path: hello_world
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Download artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: hello_world-binary
       
-      - name: Make binary executable
-        run: chmod +x hello_world
-      
-      - name: Deploy to QEMU
-        env:
-          QEMU_HOST: localhost
-          QEMU_PORT: 2222
-          QEMU_USER: root
+      - name: Show binary info
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.QEMU_SSH_KEY }}" > ~/.ssh/qemu_key
-          chmod 600 ~/.ssh/qemu_key
-          
-          scp -o StrictHostKeyChecking=no \
-              -i ~/.ssh/qemu_key \
-              -P $QEMU_PORT \
-              hello_world $QEMU_USER@$QEMU_HOST:/tmp/
-          
-          ssh -o StrictHostKeyChecking=no \
-              -i ~/.ssh/qemu_key \
-              -p $QEMU_PORT \
-              $QEMU_USER@$QEMU_HOST \
-              "/tmp/hello_world"
+          file hello_world
+          ls -lh hello_world
