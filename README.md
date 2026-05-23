@@ -1,205 +1,119 @@
-# Embedded Gateway Dashboard
+# Embedded Gateway Dashboard 🌐
 
-A frontend-first dashboard for monitoring and interacting with gateways and edge devices. This repository is primarily a modern TypeScript single-page application (Vite + Tailwind) that implements UI screens, components, and example data for a gateway/device dashboard. It includes screenshots and static assets to demonstrate the design and expected flows.
+A modern dashboard for monitoring and managing embedded gateways and edge devices.
 
-This repo focuses on the user interface and developer-facing pieces — it provides a working SPA and UI prototypes. The backend in this repository is a collection of CGI scripts and helpers intended to be deployed under /www on OpenWrt-based gateway systems (see the /backend directory content below).
+This project combines a polished frontend with lightweight backend utilities for gateway environments such as OpenWrt- or prplOS-based systems. The goal is simple: make device management, network visibility, and system monitoring feel clear, practical, and approachable.
 
-## What the repository contains now
+## ✨ What this project is about
 
-- Frontend: TypeScript-based SPA built with Vite and styled with Tailwind CSS (source under `src/`, SPA bootstrap at `index.html`).
-- Static assets and screenshots (root) to show the UI and flows.
-- A `backend/` directory containing CGI scripts and small shell helpers intended to run from the device web root (`/www`) on OpenWrt-based gateways — these are not a full packaged service but are deployable web endpoints for embedded firmware.
-- Tooling and config files for building and linting (Vite, Tailwind, TypeScript, ESLint, etc.).
-- Lockfiles for package managers (bun.lockb and package-lock.json).
+The dashboard is built to help you:
 
-## Backend (what's actually in /backend)
+- view gateway and device status at a glance
+- inspect connected devices and network activity
+- run network and performance checks
+- explore logs, alerts, and system health
+- interact with common gateway features through a cleaner UI
 
-The backend directory contains CGI scripts and small shell helpers that are expected to live inside the gateway's web root (/www) on an OpenWrt-based system. These scripts implement device management pages, network utilities, and monitoring endpoints used by the frontend UI:
+It started as a frontend-heavy project and now also includes backend CGI endpoints plus native daemons for cached monitoring tasks.
 
-- connected-device.cgi — Manage device popup and details for connected devices
-- credentials.cgi — Settings page for updating credentials (username/password)
-- dashboard_data.cgi — Internet speed test enhancements and dashboard data
-- dhcp_dns.cgi — DHCP & DNS configuration and IP range validation
-- firewall.cgi — Firewall-related endpoints (legacy/compat behavior)
-- network.cgi — Network page and gateway-status detection fixes
-- network_monitor.sh — Wifi auth alerting backend helper
-- packet-analyzer.cgi — Network analysis endpoints used by the UI
-- performance.cgi — QoS management and SQM integration
-- ping.cgi — Ping/check endpoints and network page helpers
-- reboot.cgi — System page endpoint for reboot and system actions
-- security_alerts.cgi — Wifi authentication alerts reporting
-- speed_test.cgi — Internet speed test endpoint
-- system_info.cgi — System information retrieval endpoint
-- wifi_monitor.sh — Wifi log mechanism to capture failed auths
-- wireless.cgi — Wireless configuration and status endpoints
+## 🖼️ Preview
 
-These scripts are designed as lightweight web endpoints (CGI + small shell scripts) so they can be deployed directly into the gateway firmware image (for example into /www) and called from the frontend UI. They are not a full standalone backend service with database persistence; instead they bridge the SPA to on-device utilities and configuration.
+Main dashboard view:
 
-## Current, implemented functionality (frontend-focused)
-- Dashboard UI and layout for device/gateway overviews.
-- Device list and detail panels (UI and mock/example data).
-- Telemetry charts and lightweight visual mockups for time-series metrics.
-- Logs/event stream UI with filtering and live/demo data.
-- Control action UI elements (buttons/forms) demonstrating control flows wired to frontend handlers and the CGI endpoints in `/backend`.
+![Embedded Gateway Dashboard](./home%20gateway.png)
 
-Note: While the frontend is a complete SPA, backend behavior (persistence, authentication, packaging, or fully featured protocol adapters) is limited to the supplied CGI endpoints and helper scripts and may require adaptation for production firmware.
+More UI screenshots are included in the repository root to show the different pages and flows.
 
-## Quick start (developer)
-1. Install dependencies
-   - npm: `npm install`
-   - or if you prefer bun: `bun install`
-2. Run dev server
-   - npm: `npm run dev` (or the equivalent defined in package.json)
-3. Build for production
-   - npm: `npm run build`
-4. Preview the built SPA
-   - npm: `npm run preview`
+## 🚀 Highlights
 
-(Exact script names are defined in package.json — please refer to it if a different package manager or script is preferred.)
+- `Frontend SPA` built with Vite, TypeScript, and Tailwind CSS
+- `Backend CGI layer` for gateway-side actions and data exchange
+- `Performance daemon` for cached network performance monitoring
+- `Packet analyzer daemon` for lightweight packet capture summaries
+- `Gateway-focused design` for embedded and edge-device use cases
 
-## Building the backend daemons
-The repository now contains two native backend daemons under `backend/daemons/`:
+## 🧩 What’s inside
 
-- `performance` — collects latency / packet loss / throughput and writes cached JSON consumed by `performance.cgi`
-- `packet-analyzerd` — captures packet data and writes cached JSON consumed by `packet-analyzer.cgi`
+### Frontend
 
-These binaries are target-specific. The produced executable matches the compiler/toolchain you use:
+The frontend lives in `src/` and provides the main user experience:
 
-- build with your host compiler on x86_64 Linux: you get an x86_64 binary
-- build with an ARM toolchain: you get an ARM binary for Raspberry Pi / other ARM targets
-- build with an OpenWrt/prplOS SDK toolchain: you get a binary suitable for that firmware target
+- dashboard overview
+- connected devices
+- network tools
+- packet analysis
+- performance monitoring
+- firewall and settings pages
+- system and security views
 
-The `backend/Makefile` is intentionally configurable:
+### Backend
 
-- `CC` — compiler to use
-- `CROSS_COMPILE` — optional toolchain prefix, e.g. `aarch64-openwrt-linux-musl-`
-- `STATIC=1` — add `-static` at link time
-- `CPPFLAGS`, `CFLAGS`, `LDFLAGS`, `LDLIBS` — standard build overrides
+The `backend/` folder contains the gateway-side pieces:
 
-Examples:
+- CGI scripts used by the frontend
+- helper shell scripts
+- native daemons for background monitoring
+- init scripts for service startup
 
-1. Build natively on the current machine:
-   - `cd backend`
-   - `make build/bin/performance`
-   - `make build/bin/packet_analyzerd`
+In short:
 
-2. Build a static x86_64 binary with musl (useful for the QEMU/prplOS VM flow used during development):
-   - `cd backend`
-   - `make build/bin/performance CC=musl-gcc STATIC=1`
-   - `make build/bin/packet_analyzerd CC=musl-gcc STATIC=1`
+- `performance` handles cached latency, packet loss, and throughput metrics
+- `packet-analyzerd` handles packet capture summaries for the packet analysis page
 
-3. Build with a cross-toolchain prefix from an OpenWrt/prplOS SDK:
-   - `cd backend`
-   - `make build/bin/performance CROSS_COMPILE=<toolchain-prefix> STATIC=1`
-   - `make build/bin/packet_analyzerd CROSS_COMPILE=<toolchain-prefix> STATIC=1`
+## 🛠️ Running the frontend locally
 
-4. Build with an explicit compiler path/wrapper instead of a prefix:
-   - `cd backend`
-   - `make build/bin/performance CC=/path/to/your/target-gcc STATIC=1`
-   - `make build/bin/packet_analyzerd CC=/path/to/your/target-gcc STATIC=1`
+From the project root:
 
-Notes:
+```bash
+npm install
+npm run dev
+```
 
-- For a Raspberry Pi 3/4 or any real gateway target, use the exact compiler/toolchain that matches the target userspace and libc. Do not assume a binary built for the x86_64 QEMU VM will run on ARM hardware.
-- For OpenWrt/prplOS-style targets, the safest route is to build with the matching SDK/buildroot toolchain for that image.
-- If you are unsure which toolchain prefix to use, inspect your SDK/buildroot environment and reuse the compiler wrapper it provides.
+To build the frontend:
 
-## Deployment (to an OpenWrt-based gateway)
-This section explains how to deploy both the backend CGI scripts and the built frontend SPA so the dashboard can be served directly from the gateway.
+```bash
+npm run build
+```
 
-1) Build the frontend locally
-- From the project root:
-  - Install: `npm install` (or `bun install`)
-  - Build: `npm run build`
-- The Vite build output is typically `dist/`. Verify the build directory after running the build.
+## ⚙️ About the backend
 
-2) Choose a web-root path on the gateway
-- Option A (root): copy UI to `/www/` so the dashboard is served at `https://<gateway>/`
-- Option B (subpath): copy UI to `/www/embedded-dashboard/` and set the Vite base to `/embedded-dashboard/` before building
-  - To set base, edit `vite.config.ts` or set `--base /embedded-dashboard/` when running the build
+The backend is designed for gateway-style Linux targets rather than a typical cloud server.
 
-3) Copy files to the gateway
-- Example using scp/rsync:
-  - Copy built UI:
-    - `scp -r dist/* root@<GW>:/www/embedded-dashboard/`
-  - Copy backend scripts:
-    - `scp backend/*.cgi root@<GW>:/www/`
-    - `scp backend/*.sh root@<GW>:/www/`
-  - Copy backend daemons (if you are using the daemon-based monitoring flow):
-    - `scp backend/build/bin/performance root@<GW>:/usr/sbin/gateway-perfd`
-    - `scp backend/build/bin/packet_analyzerd root@<GW>:/usr/sbin/packet-analyzerd`
-    - `scp backend/init.d/performance root@<GW>:/etc/init.d/performance`
-    - `scp backend/init.d/packet-analyzerd root@<GW>:/etc/init.d/packet-analyzerd`
+That means:
 
-4) Set permissions on the gateway
-- SSH to gateway and run:
-  - `chmod +x /www/*.cgi /www/*.sh`
-  - `chmod +x /usr/sbin/gateway-perfd /usr/sbin/packet-analyzerd`
-  - `chmod +x /etc/init.d/performance /etc/init.d/packet-analyzerd`
-  - `chown root:root /www/*.cgi /www/*.sh` (or suitable owner)
-- Verify script shebangs (e.g. `#!/bin/sh`, `#!/bin/bash`, or `#!/usr/bin/env node`) and that required interpreters exist on the device.
+- CGI scripts are meant to run on the device web root
+- daemons are meant to run on the target system as background services
+- compiled binaries must match the target architecture
 
-5) Enable and start the daemon services
-- SSH to gateway and run:
-  - `/etc/init.d/performance enable`
-  - `/etc/init.d/performance restart`
-  - `/etc/init.d/packet-analyzerd enable`
-  - `/etc/init.d/packet-analyzerd restart`
+So if you build on:
 
-6) Configure uHTTPd (or your web server)
-- Ensure CGI execution is enabled and the document root includes your files.
-- Example minimal uhttpd snippet (add to `/etc/config/uhttpd` or equivalent):
+- `x86_64` → you get an x86_64 binary
+- `ARM / Raspberry Pi` → you need an ARM-compatible toolchain
 
-config uhttpd 'main'
-    option home '/www'
-    option rfc1918_filter '1'
-    option cgi_prefix '/api'
+The backend `Makefile` is flexible enough to support native builds and cross-compilation without locking the project to one target.
 
-config cgi
-    option match '^/.*\.cgi$'
-    option interpreter '/usr/bin/env bash'
+## 🎯 Current focus
 
-- If you install the C CGI binary at `/www/api/v1/system/info`, the `cgi_prefix /api` line ensures `/api/v1/system/info` is executed directly (no `.cgi` suffix required).
+This repository is strongest today in:
 
-- If you serve the SPA from a subpath (eg `/embedded-dashboard/`), ensure the document root contains that folder and asset paths match the SPA base.
+- frontend experience and page coverage
+- embedded dashboard concepts and flows
+- practical backend integration for gateway monitoring
 
-7) SPA routing / fallback
-- For history-mode client-side routing, configure the web server to serve `index.html` for unknown routes, or use hash-based routing to avoid server rewrites.
+It is a good foundation for:
 
-8) Paths & CORS
-- If SPA and CGI live on the same host/port, CORS is not needed. If hosted separately, enable CORS or proxy requests.
-- Confirm the frontend points to the correct CGI paths (relative vs absolute). Update the frontend config if you moved scripts to a different path.
+- gateway demos
+- student or research projects
+- OpenWrt / prplOS experiments
+- custom device management interfaces
 
-9) Runtime dependencies & privileges
-- Confirm utilities used by scripts (ip, tc, sqm, ping, etc.) are present on the gateway and that scripts have the privileges needed to run them.
-- Actions like reboot or firewall modification require root privileges.
-- `packet-analyzerd` requires `tcpdump` on the target.
+## 🤝 Contributing
 
-10) Post-deploy checks
-- Visit the dashboard in a browser and open DevTools → Network to confirm assets load.
-- Call a CGI endpoint directly (e.g. `https://<GW>/speed_test.cgi`) to verify output.
-- Confirm daemon output files are being refreshed:
-  - `/tmp/performance.json`
-  - `/tmp/packet_analyzer.json`
-- Check logs (`/var/log/messages`, uhttpd logs) for script errors.
+Contributions are welcome.
 
-11) Packaging into firmware (optional)
-- For reproducible deployments, include the frontend and backend files in an OpenWrt image or create an IPK package to install them.
+If you want to improve the UI, extend backend coverage, or package the project more cleanly for embedded targets, feel free to open an issue or a pull request.
 
-## Deploy example commands (summary)
-- Build & copy (example):
-  - `npm install && npm run build`
-  - `scp -r dist/* root@<GW>:/www/embedded-dashboard/`
-  - `scp backend/*.cgi root@<GW>:/www/`
-  - `scp backend/build/bin/performance root@<GW>:/usr/sbin/gateway-perfd`
-  - `scp backend/build/bin/packet_analyzerd root@<GW>:/usr/sbin/packet-analyzerd`
-  - `ssh root@<GW> 'chmod +x /www/*.cgi /www/*.sh'`
+## 👤 Author
 
-## Contributing
-Contributions are welcome. If you plan to extend the backend into a production agent, add protocol adapters, or create an OpenWrt package, please open an issue describing the intended scope so we can coordinate.
+By Yassin Omri
 
-## Author
-By: Yassin Omri
-
-## License
-No license file is included in this repository.
