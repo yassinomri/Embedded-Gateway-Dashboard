@@ -42,40 +42,14 @@ export default function Login() {
   const onSubmit = async (data: LoginFormValues) => {
     try {
       setError(null);
-      const response = await fetch('http://192.168.1.2/cgi-bin/credentials.cgi?action=login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: data.username,
-          password: data.password,
-        }),
-      });
-
-      const text = await response.text();
-      console.log("Raw response:", text);
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch (e) {
-        setError("Invalid response from server");
-        return;
-      }
-      console.log("Parsed result:", result);
-
-      if (result.success) {
-        sessionStorage.setItem('currentCredentials', JSON.stringify({
-          username: data.username,
-          password: data.password,
-        }));
-        await login(data.username, data.password);
-        window.location.href = "/";
-      } else {
-        setError(result.error || "Invalid username or password");
-      }
+      await login(data.username, data.password);
+      sessionStorage.setItem('currentCredentials', JSON.stringify({
+        username: data.username,
+        password: data.password,
+      }));
+      navigate("/");
     } catch (err) {
-      setError("Login failed - please try again");
+      setError(err instanceof Error ? err.message : "Login failed - please try again");
     }
   };
 
