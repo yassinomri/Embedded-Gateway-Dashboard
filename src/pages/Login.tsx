@@ -45,10 +45,6 @@ export default function Login() {
     try {
       setError(null);
       await login(data.username, data.password);
-      sessionStorage.setItem('currentCredentials', JSON.stringify({
-        username: data.username,
-        password: data.password,
-      }));
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed - please try again");
@@ -169,7 +165,7 @@ export default function Login() {
                     <FormItem>
                       <FormLabel className="text-slate-700 dark:text-slate-200">Username</FormLabel>
                       <FormControl>
-                        <Input placeholder="admin" autoComplete="username" className={inputClass} {...field} />
+                        <Input placeholder="root" autoComplete="username" className={inputClass} {...field} />
                       </FormControl>
                       <FormMessage className="text-red-600 dark:text-red-400" />
                     </FormItem>

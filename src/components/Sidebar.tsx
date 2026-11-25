@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { apiClient } from "@/lib/network-api";
+import { apiClient } from "@/lib/system-api";
 
 interface NavItemProps {
   title: string;
@@ -77,7 +77,7 @@ export function MainSidebar() {
 
   const handleReboot = () => {
       apiClient
-        .rebootSystem()
+        .reboot()
         .then(() => {
           alert("The system is rebooting...");
         })

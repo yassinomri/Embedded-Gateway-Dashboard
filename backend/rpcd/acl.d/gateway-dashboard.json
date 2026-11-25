@@ -1,0 +1,18 @@
+{
+	"gateway-dashboard": {
+		"description": "Gateway Admin dashboard",
+		"read": {
+			"ubus": {
+				"session": [ "access", "destroy" ],
+				"system": [ "board", "info" ],
+				"gateway": [ "cpu_info" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"system": [ "reboot" ],
+				"gateway": [ "set_password" ]
+			}
+		}
+	}
+}

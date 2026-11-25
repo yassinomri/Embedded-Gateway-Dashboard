@@ -26,9 +26,7 @@ export function SyncManager({ autoSync = false, onSyncComplete }: SyncManagerPro
         "http://192.168.1.2/cgi-bin/network.cgi?option=get",
         "http://192.168.1.2/cgi-bin/wireless.cgi?option=get",
         "http://192.168.1.2/cgi-bin/dhcp_dns.cgi?option=get",
-        "http://192.168.1.2/cgi-bin/system_info.cgi",
-        "http://192.168.1.2/cgi-bin/firewall.cgi?option=get",
-        "http://192.168.1.2/cgi-bin/reboot.cgi"
+        "http://192.168.1.2/cgi-bin/firewall.cgi?option=get"
       ];
       
       // Try each endpoint

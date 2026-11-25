@@ -56,7 +56,8 @@ The frontend lives in `src/` and provides the main user experience:
 
 The `backend/` folder contains the gateway-side pieces:
 
-- `cgi-scripts/` — CGI endpoints and helper shell scripts used by the frontend
+- `rpcd/` — rpcd plugin (`gateway` ubus object) and the ACL used by the dashboard
+- `cgi-scripts/` — legacy CGI endpoints, being migrated to ubus
 - `daemons/` — native C daemons for background monitoring
 - `init.d/` — procd init scripts for service startup
 - `Makefile` — builds the daemons natively or with a cross-compiler
@@ -75,11 +76,56 @@ npm install
 npm run dev
 ```
 
+The dev server proxies `/ubus` and `/cgi-bin` to the gateway at `http://192.168.1.2`.
+Point it at another device with:
+
+```bash
+GATEWAY_URL=http://192.168.1.1 npm run dev
+```
+
 To build the frontend:
 
 ```bash
 npm run build
 ```
+
+## 🔐 Authentication and the ubus API
+
+The dashboard talks to the gateway through OpenWrt's native **ubus** bus, exposed over
+HTTP as JSON-RPC by `uhttpd` (`/ubus`) and `rpcd`:
+
+```
+Browser ──JSON-RPC──▶ uhttpd /ubus ──▶ rpcd ──▶ ubus objects
+                                         │        ├─ system  (built in: board, info, reboot)
+                                         │        └─ gateway (rpcd/plugins/gateway)
+                                         └─ session + ACL check on every call
+```
+
+- **Login** opens an rpcd session (`session.login`). The browser only keeps the session id,
+  never the password. Users are the gateway's system users (by default `root`).
+- **Every call is authorised on the gateway** against the session and the ACL in
+  `rpcd/acl.d/gateway-dashboard.json`. Expired sessions send the user back to the login page.
+- **No shell process per request** for built-in objects such as `system board` and `system info`.
+
+### Install on the gateway
+
+Requires `rpcd` and `uhttpd-mod-ubus` (installed by default with LuCI).
+
+```bash
+cd backend
+make install DESTDIR=/path/to/rootfs     # or copy the files listed in the Makefile
+/etc/init.d/rpcd reload                  # on the gateway, to load the plugin and ACL
+```
+
+### Migration status
+
+| Feature | Backend |
+| --- | --- |
+| Login, logout, session expiry | ubus (`session`) |
+| System information | ubus (`system`, `gateway.cpu_info`) |
+| Reboot | ubus (`system.reboot`) |
+| Password change | ubus (`gateway.set_password`) |
+| Dashboard, network, wireless, DHCP/DNS, firewall, devices, alerts, performance, packet analysis, speed test | CGI (to be migrated) |
 
 ## ⚙️ About the backend
 

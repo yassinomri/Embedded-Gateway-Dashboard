@@ -1,9 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
+import { changePassword } from "@/lib/login-api";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 export default function Settings() {
+  const { user } = useAuth();
+  const username = user?.username ?? "";
   const [changeData, setChangeData] = useState({
-    username: "admin",
     newPassword: "",
     retypeNewPassword: "",
   });
@@ -20,6 +25,11 @@ export default function Settings() {
     e.preventDefault();
     setChangeError(null);
     setChangeSuccess(false);
+
+    if (changeData.newPassword.length < MIN_PASSWORD_LENGTH) {
+      setChangeError(`New password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
 
     if (changeData.newPassword !== changeData.retypeNewPassword) {
       setChangeError("New passwords do not match.");
@@ -41,37 +51,14 @@ export default function Settings() {
     }
 
     try {
-      // Call backend API to change credentials
-      const response = await fetch('/cgi-bin/credentials.cgi?action=change', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: changeData.username,
-          currentPassword: currentPassword,
-          newPassword: changeData.newPassword
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Update stored credentials with new password
-        sessionStorage.setItem('currentCredentials', JSON.stringify({
-          username: changeData.username,
-          password: changeData.newPassword
-        }));
-
-        setChangeSuccess(true);
-        setChangeData({ username: "admin", newPassword: "", retypeNewPassword: "" });
-        setShowConfirmPopup(false);
-        setCurrentPassword("");
-      } else {
-        setConfirmError(result.error || "Failed to update credentials.");
-      }
+      // The gateway verifies the current password before changing it.
+      await changePassword(username, currentPassword, changeData.newPassword);
+      setChangeSuccess(true);
+      setChangeData({ newPassword: "", retypeNewPassword: "" });
+      setShowConfirmPopup(false);
+      setCurrentPassword("");
     } catch (err) {
-      setConfirmError("Network error. Please try again.");
+      setConfirmError(err instanceof Error ? err.message : "Failed to update the password.");
     }
   };
 
@@ -85,18 +72,19 @@ export default function Settings() {
     <div className="flex min-h-screen w-full items-center justify-center bg-background">
       <div className="mx-auto w-full max-w-md space-y-6 rounded-lg border p-8 shadow-lg">
         <h1 className="text-2xl font-bold mb-4 text-center">Account Settings</h1>
-        <h2 className="text-lg font-semibold mb-2">Change Credentials</h2>
+        <h2 className="text-lg font-semibold mb-2">Change Password</h2>
         {changeSuccess ? (
-          <p className="text-green-600">Credentials updated successfully!</p>
+          <p className="text-green-600">Password updated successfully!</p>
         ) : (
           <div className="space-y-3">
             <input
               type="text"
               required
               placeholder="Username"
-              className="w-full border rounded px-2 py-1"
-              value={changeData.username}
-              onChange={e => setChangeData({ ...changeData, username: e.target.value })}
+              className="w-full border rounded px-2 py-1 bg-gray-50 text-gray-600"
+              value={username}
+              readOnly
+              aria-label="Username"
             />
             <div className="relative">
               <input

@@ -1,11 +1,16 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { toast } from "@/hooks/use-toast";
-import { login as apiLogin } from "@/lib/login-api";
+import { login as apiLogin, logout as apiLogout } from "@/lib/login-api";
+import { onSessionExpired, setSession } from "@/lib/ubus";
+import { brand } from "@/lib/brand";
 
 interface User {
-  id: string;
   username: string;
-  role: "admin" | "user";
+}
+
+interface StoredSession {
+  username: string;
+  sid: string;
 }
 
 interface AuthContextType {
@@ -18,57 +23,76 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Only the rpcd session id is stored, never the password.
+const STORAGE_KEY = "gateway-session";
+
+function readStoredSession(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.sid === "string" && typeof parsed?.username === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearStoredSession() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* storage unavailable */
+  }
+  setSession(null);
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check for existing session on mount
-  useEffect(() => {
-    const checkAuth = async () => {
-      const storedUser = localStorage.getItem("openwrt-user");
-      
-      if (storedUser) {
-        try {
-          setUser(JSON.parse(storedUser));
-        } catch (error) {
-          console.error("Failed to parse stored user", error);
-          localStorage.removeItem("openwrt-user");
-        }
-      }
-      
-      setIsLoading(false);
-    };
-
-    checkAuth();
+  const endSession = useCallback(() => {
+    clearStoredSession();
+    setUser(null);
   }, []);
+
+  // Restore a previous session and react when the gateway rejects it.
+  useEffect(() => {
+    const stored = readStoredSession();
+    if (stored) {
+      setSession(stored.sid);
+      setUser({ username: stored.username });
+    }
+
+    onSessionExpired(() => {
+      endSession();
+      toast({
+        title: "Session expired",
+        description: "Please log in again.",
+        variant: "destructive",
+      });
+    });
+
+    setIsLoading(false);
+    return () => onSessionExpired(null);
+  }, [endSession]);
 
   const login = async (username: string, password: string) => {
     setIsLoading(true);
-
     try {
-      // Call your backend API
-      const result = await apiLogin(username, password);
-
-      if (result.success) {
-        const user = {
-          id: "1",
-          username,
-          role: "admin" as const
-        };
-        setUser(user);
-        localStorage.setItem("openwrt-user", JSON.stringify(user));
-        toast({
-          title: "Login successful",
-          description: "Welcome to Gateway Admin"
-        });
-      } else {
-        throw new Error(result.error || "Invalid credentials");
+      const sid = await apiLogin(username, password);
+      setSession(sid);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ username, sid }));
+      } catch {
+        /* session still works for this tab */
       }
+      setUser({ username });
+      toast({ title: "Login successful", description: `Welcome to ${brand.name}` });
     } catch (error) {
       toast({
         title: "Login failed",
         description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive"
+        variant: "destructive",
       });
       throw error;
     } finally {
@@ -77,23 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    setUser(null);
-    localStorage.removeItem("openwrt-user");
-    toast({
-      title: "Logged out",
-      description: "You have been successfully logged out"
-    });
+    // Close the session on the gateway; log out locally even if it is unreachable.
+    apiLogout().catch(() => undefined);
+    endSession();
+    toast({ title: "Logged out", description: "You have been successfully logged out" });
   };
 
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        isAuthenticated: !!user,
-        login,
-        logout
-      }}
+      value={{ user, isLoading, isAuthenticated: !!user, login, logout }}
     >
       {children}
     </AuthContext.Provider>
@@ -103,22 +119,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const context = useContext(AuthContext);
-  
   if (context === undefined) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
-  
   return context;
 }
-
-// Additional code to handle login result
-const handleLoginResult = async (result: { success: boolean; error?: string }, data: { username: string; password: string }) => {
-  if (result.success) {
-    sessionStorage.setItem('currentCredentials', JSON.stringify({
-      username: data.username,
-      password: data.password,
-    }));
-    window.location.href = "/";
-  }
-};
-

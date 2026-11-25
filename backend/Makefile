@@ -60,6 +60,10 @@ install: all
 	install -d $(DESTDIR)/etc/init.d
 	install -m 0755 init.d/performance $(DESTDIR)/etc/init.d/performance
 	install -m 0755 init.d/packet-analyzerd $(DESTDIR)/etc/init.d/packet-analyzerd
+	install -d $(DESTDIR)/usr/libexec/rpcd
+	install -m 0755 rpcd/plugins/gateway $(DESTDIR)/usr/libexec/rpcd/gateway
+	install -d $(DESTDIR)/usr/share/rpcd/acl.d
+	install -m 0644 rpcd/acl.d/gateway-dashboard.json $(DESTDIR)/usr/share/rpcd/acl.d/gateway-dashboard.json
 
 clean:
 	rm -rf $(BUILD_DIR)

@@ -1,0 +1,96 @@
+#!/bin/sh
+# rpcd exec plugin exposing the "gateway" ubus object.
+#
+# rpcd runs "gateway list" once to learn the methods and their arguments,
+# then "gateway call <method>" with the JSON arguments on stdin.
+# Access is controlled by /usr/share/rpcd/acl.d/gateway-dashboard.json.
+
+. /usr/share/libubox/jshn.sh
+
+MIN_PASSWORD_LENGTH=8
+
+reply_error() {
+	json_init
+	json_add_boolean success 0
+	json_add_string error "$1"
+	json_dump
+	exit 0
+}
+
+cpu_info() {
+	local model cores
+	model=$(sed -n 's/^\(model name\|Model\|cpu model\|system type\|Processor\)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n 1)
+	cores=$(grep -c '^processor' /proc/cpuinfo)
+
+	json_init
+	json_add_string model "$model"
+	json_add_int cores "${cores:-0}"
+	json_dump
+}
+
+set_password() {
+	local input username current_password new_password request response sid
+	input=$(cat)
+
+	json_load "$input" 2>/dev/null || reply_error "Invalid request"
+	json_get_var username username
+	json_get_var current_password current_password
+	json_get_var new_password new_password
+
+	# Only plain system user names, and only users that exist.
+	case "$username" in
+		''|-*|*[!a-z0-9_-]*) reply_error "Invalid username" ;;
+	esac
+	grep -q "^${username}:" /etc/passwd || reply_error "Unknown user"
+
+	[ ${#new_password} -ge $MIN_PASSWORD_LENGTH ] ||
+		reply_error "New password must be at least $MIN_PASSWORD_LENGTH characters"
+	case "$new_password" in
+		*"
+"*) reply_error "Password must not contain line breaks" ;;
+	esac
+
+	# Verify the current password by opening (and immediately closing)
+	# a temporary rpcd session with it.
+	json_init
+	json_add_string username "$username"
+	json_add_string password "$current_password"
+	request=$(json_dump)
+	response=$(ubus call session login "$request" 2>/dev/null) ||
+		reply_error "Current password is incorrect"
+
+	sid=""
+	json_load "$response" 2>/dev/null && json_get_var sid ubus_rpc_session
+	case "$sid" in
+		''|*[!0-9a-f]*) reply_error "Current password is incorrect" ;;
+	esac
+	ubus call session destroy "{\"ubus_rpc_session\":\"$sid\"}" >/dev/null 2>&1
+
+	printf '%s\n%s\n' "$new_password" "$new_password" | passwd "$username" >/dev/null 2>&1 ||
+		reply_error "Failed to update the password"
+
+	json_init
+	json_add_boolean success 1
+	json_dump
+}
+
+case "$1" in
+	list)
+		json_init
+		json_add_object cpu_info
+		json_close_object
+		json_add_object set_password
+		json_add_string username "str"
+		json_add_string current_password "str"
+		json_add_string new_password "str"
+		json_close_object
+		json_dump
+		;;
+	call)
+		case "$2" in
+			cpu_info) cpu_info ;;
+			set_password) set_password ;;
+			*) reply_error "Unknown method" ;;
+		esac
+		;;
+esac
