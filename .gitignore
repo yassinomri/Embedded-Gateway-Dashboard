@@ -24,7 +24,6 @@ dist-ssr
 *.sw?
 
 # Binaries
-hello_world
 *.o
 *.a
 build/

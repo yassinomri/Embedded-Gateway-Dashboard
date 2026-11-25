@@ -25,13 +25,6 @@ import System from "./pages/System";
 import SecurityLogs from "./pages/SecurityLogs";
 import Settings from "@/pages/Settings";
 
-const PlaceholderPage = ({ title }: { title: string }) => (
-  <div className="container mx-auto p-6">
-    <h1 className="text-3xl font-bold">{title}</h1>
-    <p className="text-muted-foreground">This page is under construction</p>
-  </div>
-);
-
 const queryClient = new QueryClient();
 
 const App = () => (

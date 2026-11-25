@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,7 +35,7 @@ static int read_iface_bytes(const char *iface, unsigned long long *rx, unsigned 
 int collect_performance_metrics(struct performance_metrics *out) {
   if (!out) return -1;
 
-  const char *target = getwenv("PERF_TARGET");
+  const char *target = getenv("PERF_TARGET");
   if (!target || !*target) target = "8.8.8.8";
 
   char cmd[256];

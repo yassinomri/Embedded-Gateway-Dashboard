@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +12,21 @@
 #define TARGET_FILE "/tmp/perf_target_ip"
 #define OUTPUT_FILE "/tmp/performance.json"
 #define INTERVAL_SECONDS 30
+
+/*
+ * The target is passed to ping through a shell, so only accept characters
+ * that can appear in an IPv4/IPv6 address or a hostname.
+ */
+static int is_safe_target(const char *s) {
+  if (!s || !*s || *s == '-') return 0;
+  for (; *s; s++) {
+    char c = *s;
+    int ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+             (c >= '0' && c <= '9') || c == '.' || c == '-' || c == ':';
+    if (!ok) return 0;
+  }
+  return 1;
+}
 
 static void read_target_ip(char *buf, size_t buflen) {
   FILE *f = fopen(TARGET_FILE, "r");
@@ -32,6 +49,11 @@ static void read_target_ip(char *buf, size_t buflen) {
     buf[len - 1] = '\0';
   }
   fclose(f);
+
+  if (!is_safe_target(buf)) {
+    strncpy(buf, DEFAULT_TARGET, buflen - 1);
+    buf[buflen - 1] = '\0';
+  }
 }
 
 static void write_json(const struct performance_metrics *metrics) {

@@ -20,9 +20,15 @@ It started as a frontend-heavy project and now also includes backend CGI endpoin
 
 Main dashboard view:
 
-![Embedded Gateway Dashboard](./home%20gateway.png)
+![Embedded Gateway Dashboard](./docs/screenshots/dashboard.png)
 
-More UI screenshots are included in the repository root to show the different pages and flows.
+| Network configuration | Firewall rules |
+| --- | --- |
+| ![Network configuration](./docs/screenshots/network-configuration.png) | ![Firewall rules](./docs/screenshots/firewall-rules.png) |
+| **Performance** | **Connected device management** |
+| ![Performance](./docs/screenshots/performance.png) | ![Manage device](./docs/screenshots/manage-device.png) |
+
+More screenshots are in [`docs/screenshots/`](./docs/screenshots/).
 
 ## 🚀 Highlights
 
@@ -50,10 +56,10 @@ The frontend lives in `src/` and provides the main user experience:
 
 The `backend/` folder contains the gateway-side pieces:
 
-- CGI scripts used by the frontend
-- helper shell scripts
-- native daemons for background monitoring
-- init scripts for service startup
+- `cgi-scripts/` — CGI endpoints and helper shell scripts used by the frontend
+- `daemons/` — native C daemons for background monitoring
+- `init.d/` — procd init scripts for service startup
+- `Makefile` — builds the daemons natively or with a cross-compiler
 
 In short:
 
