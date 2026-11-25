@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem("openwrt-user", JSON.stringify(user));
         toast({
           title: "Login successful",
-          description: "Welcome to the OpenWRT Gateway Admin"
+          description: "Welcome to Gateway Admin"
         });
       } else {
         throw new Error(result.error || "Invalid credentials");

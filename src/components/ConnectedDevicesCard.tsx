@@ -199,7 +199,7 @@ export function ConnectedDevicesCard({
               {infoLoading ? (
                 <div className="flex items-center justify-center text-gray-600">
                   <svg
-                    className="animate-spin h-5 w-5 mr-2 text-[#1DA2DA]"
+                    className="animate-spin h-5 w-5 mr-2 text-brand"
                     viewBox="0 0 24 24"
                   >
                     <circle
@@ -244,11 +244,11 @@ export function ConnectedDevicesCard({
                   value={limitValue}
                   onChange={e => setLimitValue(e.target.value)}
                   placeholder="e.g. 10"
-                  className="border-gray-300 text-black focus:ring-2 focus:ring-[#1DA2DA] transition-all duration-200"
+                  className="border-gray-300 text-black focus:ring-2 focus:ring-brand transition-all duration-200"
                   aria-label="Set bandwidth limit in Mbps"
                 />
                 <Button
-                  className="w-full bg-[#1DA2DA] hover:bg-[#1890c0] text-white"
+                  className="w-full bg-brand hover:bg-brand-600 text-white"
                   onClick={handleLimitBandwidth}
                   disabled={!limitValue}
                   aria-label="Apply bandwidth limit"
@@ -268,7 +268,7 @@ export function ConnectedDevicesCard({
             <DialogFooter>
               <Button
                 variant="secondary"
-                className="bg-[#1DA2DA] hover:bg-[#1890c0] text-white"
+                className="bg-brand hover:bg-brand-600 text-white"
                 onClick={() => { setSelectedDevice(null); setDeviceInfo(null); }}
                 aria-label="Close dialog"
               >

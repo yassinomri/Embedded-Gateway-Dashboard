@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Server, Home, Network, Shield, BarChart, Package, Settings, Power, SettingsIcon } from "lucide-react";
+import { Server, Home, Network, Shield, BarChart, Package, Power, SettingsIcon, LogOut, UserCircle2 } from "lucide-react";
+import { BrandLogo } from "@/components/BrandLogo";
+import { useAuth } from "@/hooks/use-auth";
+import { brand } from "@/lib/brand";
 import {
   Sidebar,
   SidebarContent,
@@ -41,14 +44,23 @@ const navItems: NavItemProps[] = [
 
 export function NavItem({ title, icon: Icon, path }: NavItemProps) {
   const location = useLocation();
-  const isActive = location.pathname === path || location.pathname.startsWith(path);
+  const isActive =
+    path === "/" ? location.pathname === "/" : location.pathname.startsWith(path);
 
   return (
     <SidebarGroup>
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton asChild isActive={isActive}>
-            <NavLink to={path} className="flex items-center gap-2">
+            <NavLink
+              to={path}
+              className={cn(
+                "relative flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                isActive
+                  ? "bg-brand/15 font-medium text-brand-300 before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-1 before:rounded-full before:bg-brand-400"
+                  : "text-slate-300 hover:bg-white/5 hover:text-white"
+              )}
+            >
               <Icon className="h-4 w-4" />
               <span>{title}</span>
             </NavLink>
@@ -61,6 +73,7 @@ export function NavItem({ title, icon: Icon, path }: NavItemProps) {
 
 export function MainSidebar() {
   const [rebootDialogOpen, setRebootDialogOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const handleReboot = () => {
       apiClient
@@ -80,17 +93,8 @@ export function MainSidebar() {
     <>
       <Sidebar className="bg-sidebar text-white w-52">
         <SidebarContent>
-          <div className="flex h-20 items-center px-4">
-            <div className="flex flex-col items-center gap-1">
-              <img
-                src="/src/assets/telnet_logo.png"
-                alt="Telnet Logo"
-                className="h-10 w-auto"
-              />
-              <span className="text-lg italic text-techgray font-tech">
-                Gateway Admin
-              </span>
-            </div>
+          <div className="flex h-20 items-center border-b border-white/10 px-4">
+            <BrandLogo />
           </div>
 
           <SidebarGroupContent>
@@ -105,15 +109,34 @@ export function MainSidebar() {
           </SidebarGroupContent>
         </SidebarContent>
 
-        <SidebarFooter className="border-t p-4">
+        <SidebarFooter className="space-y-3 border-t border-white/10 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2 text-sm text-slate-300">
+              <UserCircle2 className="h-5 w-5 shrink-0 text-brand-400" />
+              <span className="truncate">{user?.username ?? "admin"}</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-slate-400 hover:bg-white/10 hover:text-white"
+              onClick={logout}
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
           <Button
             variant="destructive"
-            className="w-full"
+            className="w-full border border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-600 hover:text-white"
             onClick={() => setRebootDialogOpen(true)}
           >
             <Power className="mr-2 h-4 w-4" />
             Reboot
           </Button>
+          <p className="text-center text-[11px] text-slate-500">
+            &copy; {new Date().getFullYear()} {brand.author}
+          </p>
         </SidebarFooter>
       </Sidebar>
 
@@ -131,6 +154,7 @@ export function MainSidebar() {
             </Button>
             <Button
               variant="destructive"
+              className="bg-red-600 text-white hover:bg-red-700"
               onClick={handleReboot}
               disabled={false} // You can add a loading state if needed
             >
